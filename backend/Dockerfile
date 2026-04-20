@@ -1,4 +1,4 @@
-FROM dhi.io/python:3.11-alpine3.22-dev
+FROM python:3.11-alpine
 
 WORKDIR /app
 
