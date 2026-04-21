@@ -11,9 +11,10 @@ export default function CreatePatient() {
     last_name: '',
     social_security_number: '',
     birth_date: '',
-    email_address: '',
+    email_adress: '',
     phone_number: '',
-    mailing_adress: ''
+    mailing_address: ''
+
   });
 
   const handleSubmit = async (e) => {
@@ -58,8 +59,8 @@ export default function CreatePatient() {
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Adresse e-mail</label>
-            <input type="email" className="w-full p-2 border rounded" required  
-              onChange={e => setFormData({...formData, email_address: e.target.value})} />
+            <input type="email" className="w-full p-2 border rounded" required
+              onChange={e => setFormData({...formData, email_adress: e.target.value})} />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Numéro de téléphone</label>
@@ -69,7 +70,7 @@ export default function CreatePatient() {
           <div>
             <label className="block text-sm font-medium mb-1">Adresse postale</label>
             <input type="text" className="w-full p-2 border rounded" required
-              onChange={e => setFormData({...formData, mailing_adress: e.target.value})} />
+              onChange={e => setFormData({...formData, mailing_address: e.target.value})} />
           </div>
           <div className="flex justify-end gap-3 pt-4">
             <button type="button" onClick={() => router.back()} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded">Annuler</button>
