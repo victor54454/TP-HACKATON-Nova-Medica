@@ -1,0 +1,179 @@
+import os
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI, Depends, HTTPException, Request, status
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import OAuth2PasswordRequestForm
+import asyncpg
+from passlib.context import CryptContext
+
+from config import settings
+from security import create_access_token, verify_token
+from schemas import PatientCreate, PatientResponse, TokenResponse
+from crypto import encrypt, decrypt
+from logger import setup_logger, log_info, log_warn, log_error
+
+# ── Init logger ────────────────────────────────────────────────
+os.makedirs("/app/logs", exist_ok=True)
+setup_logger()
+
+# ── Hachage des mots de passe (Argon2) ────────────────────────
+pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
+
+
+# ── Pool de connexions DB ──────────────────────────────────────
+db_pool = None
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global db_pool
+    db_pool = await asyncpg.create_pool(settings.database_url, min_size=2, max_size=10)
+    log_info("STARTUP", "Connexion PostgreSQL établie")
+    yield
+    await db_pool.close()
+    log_info("SHUTDOWN", "Pool PostgreSQL fermé")
+
+
+# ── Application ────────────────────────────────────────────────
+app = FastAPI(
+    title="H-Secure API — Nova-Médica",
+    version="1.0.0",
+    lifespan=lifespan,
+    # Désactiver les docs en prod (activer pour la démo J3 !)
+    docs_url="/docs",
+    redoc_url=None,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# ── Helpers ────────────────────────────────────────────────────
+def get_client_ip(request: Request) -> str:
+    return request.client.host if request.client else "unknown"
+
+
+# ══════════════════════════════════════════════════════════════
+#  AUTH
+# ══════════════════════════════════════════════════════════════
+
+@app.post("/api/auth/login", response_model=TokenResponse, tags=["Auth"])
+async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends()):
+    """
+    Authentification — retourne un JWT valide 30 min.
+    Log [INFO] si succès, [WARN] si échec (Test D ✅)
+    """
+    ip = get_client_ip(request)
+
+    async with db_pool.acquire() as conn:
+        user = await conn.fetchrow(
+            "SELECT id, username, password FROM users WHERE username = $1",
+            form_data.username,
+        )
+
+    # Utilisateur inexistant ou mauvais mot de passe
+    if not user or not pwd_context.verify(form_data.password, user["password"]):
+        log_warn("AUTH", f"Failed login attempt from IP {ip} — user: {form_data.username}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Identifiants incorrects",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    token = create_access_token({"sub": user["username"], "user_id": user["id"]})
+    log_info("AUTH", f"Access granted for user {user['username']} from IP {ip}")
+    return {"access_token": token, "token_type": "bearer"}
+
+
+# ══════════════════════════════════════════════════════════════
+#  PATIENTS — Routes protégées par JWT (Test B ✅)
+# ══════════════════════════════════════════════════════════════
+
+@app.get("/api/patients", response_model=list[PatientResponse], tags=["Patients"])
+async def list_patients(payload: dict = Depends(verify_token)):
+    """Liste tous les patients — JWT requis (401 sinon)"""
+    log_info("PATIENTS", f"List patients — user: {payload['sub']}")
+
+    async with db_pool.acquire() as conn:
+        rows = await conn.fetch("SELECT * FROM patients ORDER BY id")
+
+    # Déchiffrement à la volée (les données brutes en DB sont illisibles → Test C ✅)
+    return [
+        PatientResponse(
+            id=r["id"],
+            first_name=decrypt(r["first_name"]),
+            last_name=decrypt(r["last_name"]),
+            pathology=decrypt(r["pathology"]) if r["pathology"] else None,
+            birth_date=r["birth_date"],
+        )
+        for r in rows
+    ]
+
+
+@app.get("/api/patients/{patient_id}", response_model=PatientResponse, tags=["Patients"])
+async def get_patient(patient_id: int, payload: dict = Depends(verify_token)):
+    """Récupère un patient par ID — JWT requis"""
+    log_info("PATIENTS", f"Get patient {patient_id} — user: {payload['sub']}")
+
+    async with db_pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT * FROM patients WHERE id = $1", patient_id
+        )
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Patient introuvable")
+
+    return PatientResponse(
+        id=row["id"],
+        first_name=decrypt(row["first_name"]),
+        last_name=decrypt(row["last_name"]),
+        pathology=decrypt(row["pathology"]) if row["pathology"] else None,
+        birth_date=row["birth_date"],
+    )
+
+
+@app.post("/api/patients", response_model=PatientResponse, status_code=201, tags=["Patients"])
+async def create_patient(patient: PatientCreate, payload: dict = Depends(verify_token)):
+    """
+    Crée un patient — JWT requis.
+    Les données sensibles sont chiffrées AVANT insertion en DB (Test C ✅)
+    La validation Pydantic bloque les injections SQL/XSS en amont.
+    """
+    log_info("PATIENTS", f"Create patient — user: {payload['sub']}")
+
+    async with db_pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            INSERT INTO patients (first_name, last_name, pathology, birth_date, created_by)
+            VALUES ($1, $2, $3, $4, $5)
+            RETURNING *
+            """,
+            encrypt(patient.first_name),   # ← chiffré ici
+            encrypt(patient.last_name),     # ← chiffré ici
+            encrypt(patient.pathology) if patient.pathology else None,
+            patient.birth_date,
+            payload["user_id"],
+        )
+
+    return PatientResponse(
+        id=row["id"],
+        first_name=patient.first_name,   # on retourne le clair à l'appelant
+        last_name=patient.last_name,
+        pathology=patient.pathology,
+        birth_date=row["birth_date"],
+    )
+
+
+# ══════════════════════════════════════════════════════════════
+#  HEALTH CHECK (pas de JWT — pour Docker healthcheck)
+# ══════════════════════════════════════════════════════════════
+
+@app.get("/health", tags=["Ops"])
+async def health():
+    return {"status": "ok", "service": "H-Secure API"}
