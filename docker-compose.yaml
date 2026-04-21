@@ -113,6 +113,8 @@ services:
       - DOZZLE_LEVEL=info
     security_opt:
       - no-new-privileges:true
+    networks:
+      - monitoring-net
 
   # ----------------------------------------------------------
   # 5. DATABASE — PostgreSQL (réseau interne uniquement)

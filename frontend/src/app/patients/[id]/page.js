@@ -3,22 +3,26 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { Activity, Stethoscope } from 'lucide-react';
-import { use } from 'react';
+import { use, useState, useEffect } from 'react';
+import { getPatientById } from '@/services/api';
 
 /**
  * Page de profil d'un patient.
  * Affiche les informations personnelles et l'historique médical.
  */
 export default function PatientProfile({ params }) {
-    // Unwrapping des paramètres de l'URL
     const { id: patientId } = use(params);
     const { user } = useAuth();
+    const [patient, setPatient] = useState(null);
+    const consultations = [];
 
-    // Mock
-    const patient = { id: patientId, first_name: 'Jean', last_name: 'Dupont', social_security_number: '1800175000111', birth_date: '1980-05-12', email_address: 'jean.dupont@example.com', phone_number: '01 23 45 67 89', mailing_address: '123 Rue de la Paix, 75000 Paris' };
-    const consultations = [
-        { id: 101, date: '2026-04-10', diagnosis: 'Angine rouge sévère', doctor: 'Dr. Martin' }
-    ];
+    useEffect(() => {
+        getPatientById(patientId)
+            .then(data => setPatient(data))
+            .catch(err => console.error("Erreur API Patient:", err));
+    }, [patientId]);
+
+    if (!patient) return <ProtectedRoute><p className="p-8 text-slate-500">Chargement...</p></ProtectedRoute>;
 
     return (
         <ProtectedRoute>

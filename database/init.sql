@@ -52,5 +52,9 @@ CREATE TABLE IF NOT EXISTS access_logs (
 );
 
 INSERT INTO users (username, password, role)
-VALUES ('admin', '$argon2id$v=19$m=65536,t=3,p=4$hhAi5Lz3nrM2prQWQiiFEA$qU8GMH4JzhyLHq3+6pa87D1zVSx6qkIFcq8ueyZk2zg', 'admin')
+VALUES ('admin', '$argon2id$v=19$m=65536,t=3,p=4$33vPGSOk1FrLWcv5H6P0vg$In7r06WI85Kb3EHkM/L+n+ZtP6FP/F/h6m883EVacVQ', 'admin')
+ON CONFLICT (username) DO NOTHING;
+
+INSERT INTO users (username, password, role)
+VALUES ('victor', '$argon2id$v=19$m=65536,t=3,p=4$33vPGSOk1FrLWcv5H6P0vg$In7r06WI85Kb3EHkM/L+n+ZtP6FP/F/h6m883EVacVQ', 'victor')
 ON CONFLICT (username) DO NOTHING;

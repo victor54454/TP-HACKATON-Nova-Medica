@@ -17,18 +17,9 @@ export default function Dashboard() {
   const [searchTerm, setSearchTerm] = useState(''); 
 
   useEffect(() => {
-    // Mock
-    setPatients([
-      { id: 1, first_name: 'Jean', last_name: 'Dupont', social_security_number: '1800175000111', email_address: 'jean.dupont@example.com', phone_number: '06 12 34 56 78', mailing_adress: '123 Rue de Paris, 75001 Paris', last_consult: '10/04/2026' },
-      { id: 2, first_name: 'Marie', last_name: 'Martin', social_security_number: '2901234567890', email_address: 'marie.martin@example.com', phone_number: '06 87 65 43 21', mailing_adress: '456 Avenue des Champs-Élysées, 75008 Paris', last_consult: '15/04/2026' }
-    ]);
-
-    // Appel API 
-    /*
     getPatients()
       .then(data => setPatients(data))
       .catch(err => console.error("Erreur API Patients:", err));
-    */
   }, []);
 
   // Filtrage des patients en fonction du nom ou du numéro de sécurité sociale

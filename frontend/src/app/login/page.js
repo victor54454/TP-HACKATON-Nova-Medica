@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { loginUser } from '@/services/api';
 import { ShieldAlert } from 'lucide-react';
 
 /**
@@ -24,16 +25,8 @@ export default function LoginPage() {
         setError('');
 
         try {
-            // Mock
-         
-            login("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkci5ndXlvbiIsInVzZXJuYW1lIjoiZHIuZ3V5b24iLCJyb2xlIjoiYWRtaW4ifQ.faketoken");
-
-            // Appel API 
-            /*
             const data = await loginUser(username, password);
             login(data.access_token);
-            */
-
         } catch (err) {
             setError('Échec de l\'authentification. Vérifiez vos accès.');
         } finally {
