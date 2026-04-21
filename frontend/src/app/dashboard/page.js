@@ -19,8 +19,8 @@ export default function Dashboard() {
   useEffect(() => {
     // Mock
     setPatients([
-      { id: 1, first_name: 'Jean', last_name: 'Dupont', social_security_number: '1800175000111', last_consult: '10/04/2026' },
-      { id: 2, first_name: 'Marie', last_name: 'Martin', social_security_number: '2901234567890', last_consult: '15/04/2026' }
+      { id: 1, first_name: 'Jean', last_name: 'Dupont', social_security_number: '1800175000111', email_address: 'jean.dupont@example.com', phone_number: '06 12 34 56 78', mailing_adress: '123 Rue de Paris, 75001 Paris', last_consult: '10/04/2026' },
+      { id: 2, first_name: 'Marie', last_name: 'Martin', social_security_number: '2901234567890', email_address: 'marie.martin@example.com', phone_number: '06 87 65 43 21', mailing_adress: '456 Avenue des Champs-Élysées, 75008 Paris', last_consult: '15/04/2026' }
     ]);
 
     // Appel API 
@@ -88,8 +88,24 @@ export default function Dashboard() {
                       {patient.social_security_number}
                     </span>
                   </td>
+                  <td className="p-5">
+                    <span className="bg-slate-100 text-slate-700 px-3 py-1 rounded-md font-mono text-sm border border-slate-200">
+                      {patient.email_address}
+                    </span>
+                  </td>
+                  <td className="p-5">
+                    <span className="bg-slate-100 text-slate-700 px-3 py-1 rounded-md font-mono text-sm border border-slate-200">
+                      {patient.phone_number}
+                    </span>
+                  </td>
+                  <td className="p-5">
+                    <span className="bg-slate-100 text-slate-700 px-3 py-1 rounded-md font-mono text-sm border border-slate-200">
+                      {patient.mailing_adress}
+                    </span>
+                  </td>
+
                   <td className="p-5 text-right">
-                    <Link
+                    <Link     
                       href={`/patients/${patient.id}`}
                       className="inline-flex items-center gap-2 text-blue-600 hover:bg-blue-50 px-4 py-2 rounded-lg font-bold transition-all group-hover:translate-x-1"
                     >
