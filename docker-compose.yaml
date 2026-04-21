@@ -20,6 +20,7 @@ networks:
 volumes:
   postgres-data:
 
+
 services:
 
   # ----------------------------------------------------------
@@ -32,7 +33,7 @@ services:
     container_name: hsecure-frontend
     restart: unless-stopped
     ports:
-      - "3000:3000"           # seul port public exposé côté front
+      - "3000:3000" # seul port public exposé côté front
     environment:
       - VITE_API_URL=http://backend:8000
     networks:
@@ -49,17 +50,17 @@ services:
       dockerfile: Dockerfile
     container_name: hsecure-backend
     restart: unless-stopped
-    ports:
-      - "8000:8000"           # exposé uniquement pour Postman / démo
+    # ports:
+    #   - "8000:8000" # SÉCURITÉ : Port fermé, accès uniquement via le frontend proxy
     environment:
-      - DATABASE_URL=postgresql://hsecure_user:${DB_PASSWORD}@database:5432/hsecure_db
-      - JWT_SECRET=${JWT_SECRET}
+      - DATABASE_URL=postgresql://hsecure_user:${DB_PASSWORD:-postgres}@database:5432/hsecure_db
+      - JWT_SECRET=${JWT_SECRET:-test_secret_key_nova_medica_2026}
       - JWT_ALGORITHM=HS256
       - JWT_EXPIRE_MINUTES=30
-      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-VGVzdF9FbmNyeXB0aW9uX0tleV8xMjM0NTY3ODkwMTI=}
     networks:
-      - frontend-net          # parle au frontend
-      - backend-net           # parle a la DB
+      - frontend-net
+      - backend-net # parle a la DB
     depends_on:
       database:
         condition: service_healthy
@@ -74,14 +75,14 @@ services:
     environment:
       - POSTGRES_DB=hsecure_db
       - POSTGRES_USER=hsecure_user
-      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-postgres}
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - backend-net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U hsecure_user -d hsecure_db"]
+      test: [ "CMD-SHELL", "pg_isready -U hsecure_user -d hsecure_db" ]
       interval: 10s
       timeout: 5s
       retries: 5

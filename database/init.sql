@@ -17,8 +17,11 @@ CREATE TABLE IF NOT EXISTS patients (
     id          SERIAL PRIMARY KEY,  
     first_name  TEXT NOT NULL,           
     last_name   TEXT NOT NULL,           
-    social_security_number TEXT,         
+    social_security_number TEXT NOT NULL,         
     birth_date  DATE,
+    email       TEXT,
+    phone       TEXT,
+    address     TEXT,
     pathology   TEXT,                  
     created_by  INTEGER REFERENCES users(id),
     created_at  TIMESTAMP NOT NULL DEFAULT NOW(),
@@ -49,5 +52,5 @@ CREATE TABLE IF NOT EXISTS access_logs (
 );
 
 INSERT INTO users (username, password, role)
-VALUES ('admin', '$2b$12$PLACEHOLDER_HASH_TO_REPLACE', 'admin')
+VALUES ('admin', '$argon2id$v=19$m=65536,t=3,p=4$YmU4OWI5MThkNDEyZGYyNA$w9hW3tKq6U/7n/F0/m9jZg', 'admin')
 ON CONFLICT (username) DO NOTHING;

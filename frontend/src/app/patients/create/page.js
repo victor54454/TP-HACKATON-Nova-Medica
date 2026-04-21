@@ -11,21 +11,20 @@ export default function CreatePatient() {
     last_name: '',
     social_security_number: '',
     birth_date: '',
-    email_address: '',
-    phone_number: '',
-    mailing_adress: ''
+    email: '',
+    phone: '',
+    address: ''
   });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      // Appel API
-      // await createPatient(formData);
-      // Mock
-      alert("Création simulée avec succès.");
+      // Appel API réel
+      await createPatient(formData);
       router.push('/dashboard');
     } catch (error) {
-      alert("Erreur lors de la création.");
+      console.error(error);
+      alert("Erreur lors de la création du dossier.");
     }
   };
 
@@ -38,38 +37,38 @@ export default function CreatePatient() {
             <div>
               <label className="block text-sm font-medium mb-1">Nom (last_name)</label>
               <input type="text" className="w-full p-2 border rounded" required
-                onChange={e => setFormData({...formData, last_name: e.target.value})} />
+                onChange={e => setFormData({ ...formData, last_name: e.target.value })} />
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Prénom (first_name)</label>
               <input type="text" className="w-full p-2 border rounded" required
-                onChange={e => setFormData({...formData, first_name: e.target.value})} />
+                onChange={e => setFormData({ ...formData, first_name: e.target.value })} />
             </div>
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">N° Sécurité Sociale (Chiffré AES-256)</label>
             <input type="text" className="w-full p-2 border rounded font-mono" required
-              onChange={e => setFormData({...formData, social_security_number: e.target.value})} />
+              onChange={e => setFormData({ ...formData, social_security_number: e.target.value })} />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Date de naissance</label>
             <input type="date" className="w-full p-2 border rounded" required
-              onChange={e => setFormData({...formData, birth_date: e.target.value})} />
+              onChange={e => setFormData({ ...formData, birth_date: e.target.value })} />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Adresse e-mail</label>
-            <input type="email" className="w-full p-2 border rounded" required  
-              onChange={e => setFormData({...formData, email_address: e.target.value})} />
+            <input type="email" className="w-full p-2 border rounded" required
+              onChange={e => setFormData({ ...formData, email: e.target.value })} />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Numéro de téléphone</label>
             <input type="tel" className="w-full p-2 border rounded" required
-              onChange={e => setFormData({...formData, phone_number: e.target.value})} />
+              onChange={e => setFormData({ ...formData, phone: e.target.value })} />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Adresse postale</label>
             <input type="text" className="w-full p-2 border rounded" required
-              onChange={e => setFormData({...formData, mailing_adress: e.target.value})} />
+              onChange={e => setFormData({ ...formData, address: e.target.value })} />
           </div>
           <div className="flex justify-end gap-3 pt-4">
             <button type="button" onClick={() => router.back()} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded">Annuler</button>
