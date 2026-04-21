@@ -1,7 +1,5 @@
 'use client';
 
-'use client';
-
 import ProtectedRoute from '@/components/ProtectedRoute';
 import Link from 'next/link';
 
