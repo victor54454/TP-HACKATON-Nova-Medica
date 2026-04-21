@@ -2,23 +2,22 @@ FROM python:3.11-alpine
 
 WORKDIR /app
 
-# Dépendances système minimales (Alpine → apk)
+# Dépendances système minimales
 RUN apk add --no-cache \
     gcc \
     musl-dev \
     libpq-dev \
     linux-headers
 
-# Installation des dépendances Python
+# dépendances Python
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Code source
 COPY . .
 
-# Pas de root → Hardening ✅
-RUN adduser -D -u 1000 hsecure && chown -R hsecure:hsecure /app
-USER hsecure
+# 
+RUN adduser -D -u 1000 orktk && chown -R orktk:orktk /app
+USER orktk
 
 EXPOSE 8000
 
