@@ -23,7 +23,7 @@ export default function CreatePatient() {
       // Appel API
       // await createPatient(formData);
       // Mock
-      alert("Création simulée avec succès. N'oubliez pas d'activer l'appel API.");
+      alert("Création simulée avec succès.");
       router.push('/dashboard');
     } catch (error) {
       alert("Erreur lors de la création.");
