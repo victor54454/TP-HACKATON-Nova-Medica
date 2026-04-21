@@ -9,7 +9,7 @@ from passlib.context import CryptContext
 
 from config import settings
 from security import create_access_token, verify_token
-from schemas import PatientCreate, PatientResponse, TokenResponse, RegisterRequest
+from schemas import PatientCreate, PatientResponse, TokenResponse, RegisterRequest, ConsultationCreate, ConsultationResponse
 from crypto import encrypt, decrypt
 from logger import setup_logger, log_info, log_warn, log_error
 
@@ -328,3 +328,119 @@ async def delete_patient(patient_id: int, payload: dict = Depends(verify_token))
         
     log_info("PATIENTS", f"Patient {patient_id} deleted by user: {payload['sub']}")
     return {"message": f"Patient supprimé avec succès / Patient deleted successfully"}
+
+
+# ══════════════════════════════════════════════════════════════
+#  CONSULTATIONS - Gestion des consltations medicales/Management of medical consultations
+# ══════════════════════════════════════════════════════════════
+
+@app.post("/api/patients/{patient_id}/consultations",
+          response_model=ConsultationResponse, status_code=201, tags=["Consultations"] )
+async def create_consultation(patient_id: int, consultation: ConsultationCreate, payload: dict = Depends(verify_token)):
+    """
+    Crée une consultation pour un patient donné — JWT requis.
+    Create a consultation for a given patient — JWT required.
+    Seul le praticien qui a créé ce patient peut ajouter une consultation (protection IDOR).
+    Only the doctor who created this patient can add a consultation (IDOR protection).
+    Les données sensibles de la consultation sont chiffrées AVANT insertion en DB (Test C ✅)
+    The sensitive data of the consultation are encrypted BEFORE being stored in DB (Test C ✅)
+    """
+    log_info("CONSULTATIONS", f"Create consultation for patient {patient_id} — user: {payload['sub']}")
+
+    async with db_pool.acquire() as conn:
+        
+        # Check if patient exists / Vérifier si le patient existe
+        patient = await conn.fetchrow(
+            "SELECT * FROM patients WHERE id = $1", patient_id
+        )
+
+        if not patient:
+            raise HTTPException(
+                status_code=404, 
+                detail="Patient introuvable / Patient not found"
+                )
+        # Protection IDOR : check ownership / IDOR protection: vérifier la propriété du patient
+        if patient["created_by"] != payload["user_id"]:
+            raise HTTPException(
+                status_code=403, 
+                detail="Accès refusé au patient demandé/Access denied — this patient does not belong to you"
+                )    
+            
+        # Insert consultation / Insérer la consultation
+        row = await conn.fetchrow(
+            """
+            INSERT INTO consultations (patient_id, praticien_id, anamnesis, diagnosis, medical_acts, prescription)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            RETURNING *
+            """,
+            patient_id,
+            payload["user_id"],
+            encrypt(consultation.anamnesis),   # ← chiffré ici
+            encrypt(consultation.diagnosis),   # ← chiffré ici
+            encrypt(consultation.medical_acts) if consultation.medical_acts else None,
+            encrypt(consultation.prescription) if consultation.prescription else None,
+        )   
+        
+    return ConsultationResponse(
+        id=row["id"],
+        patient_id=row["patient_id"],
+        praticien_id=row["praticien_id"],
+        anamnesis=consultation.anamnesis,   # on retourne le clair à l'appelant/ we return the clear 
+        diagnosis=consultation.diagnosis,
+        medical_acts=consultation.medical_acts,
+        prescription=consultation.prescription,
+        consultation_date=row["consultation_date"],
+     )
+   
+@app.get("/api/patients/{patient_id}/consultations",
+        response_model=list[ConsultationResponse], 
+        tags=["Consultations"])    
+async def list_consultations(
+    patient_id: int,
+    payload: dict = Depends(verify_token)):
+    
+    """
+    Liste les consultations d'un patient donné — JWT requis.
+    List consultations for a given patient — JWT required.
+    """
+    log_info("CONSULTATIONS", f"List consultations for patient {patient_id} — user: {payload['sub']}")
+    
+    async with db_pool.acquire() as conn:
+        
+        # Check if patient exists / Vérifier si le patient existe
+        patient = await conn.fetchrow(
+            "SELECT * FROM patients WHERE id = $1", patient_id
+        )
+
+        if not patient:
+            raise HTTPException(
+                status_code=404, 
+                detail="Patient introuvable / Patient not found"
+                )
+        # Protection IDOR : check ownership / IDOR protection: vérifier la propriété du patient
+        if patient["created_by"] != payload["user_id"]:
+            raise HTTPException(
+                status_code=403, 
+                detail="Accès refusé au patient demandé/Access denied — this patient does not belong to you"
+                )    
+            
+        rows = await conn.fetch(
+            "SELECT * FROM consultations WHERE patient_id = $1 ORDER BY consultation_date DESC",
+            patient_id
+        )
+        
+        #Decrypt and return / Déchiffrer et retourner
+        return [
+            ConsultationResponse(
+                id=r["id"],
+                patient_id=r["patient_id"],
+                praticien_id=r["praticien_id"],
+                anamnesis=decrypt(r["anamnesis"]),
+                diagnosis=decrypt(r["diagnosis"]),
+                medical_acts=decrypt(r["medical_acts"]) if r["medical_acts"] else None,
+                prescription=decrypt(r["prescription"]) if r["prescription"] else None,
+                consultation_date=r["consultation_date"],
+            )
+            for r in rows
+        ]
+    

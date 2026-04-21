@@ -1,5 +1,5 @@
 import re
-from datetime import date
+from datetime import date, datetime
 from typing import Optional
 from pydantic import BaseModel, field_validator, Field
 
@@ -58,6 +58,35 @@ class PatientResponse(BaseModel):
     last_name:  str
     pathology:  Optional[str]
     birth_date: Optional[date]
+
+    class Config:
+        from_attributes = True
+        
+        
+# --- Consultations ---
+
+class ConsultationCreate(BaseModel):
+    """
+    Schéma pour créer une consultation / Schema for creating a consultation
+    """
+    anamnesis:    str = Field(..., min_length=1, max_length=2000)
+    diagnosis:    str = Field(..., min_length=1, max_length=2000)
+    medical_acts: Optional[str] = Field(None, max_length=2000)
+    prescription: Optional[str] = Field(None, max_length=2000)
+
+
+class ConsultationResponse(BaseModel):
+    """
+    Schéma pour la réponse consultation / Schema for consultation response
+    """
+    id:                int
+    patient_id:        int
+    praticien_id:      int
+    anamnesis:         str
+    diagnosis:         str
+    medical_acts:      Optional[str]
+    prescription:      Optional[str]
+    consultation_date: datetime
 
     class Config:
         from_attributes = True

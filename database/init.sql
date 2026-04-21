@@ -25,6 +25,20 @@ CREATE TABLE IF NOT EXISTS patients (
     updated_at  TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
+-- Table des consultations médicales
+CREATE TABLE IF NOT EXISTS consultations (
+    id          SERIAL PRIMARY KEY,
+    patient_id  INTEGER NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+    praticien_id   INTEGER NOT NULL REFERENCES users(id),
+    -- Champs chiffres AES-256 / AES-256 encrypted fields
+    anamnesis TEXT NOT NULL,
+    diagnosis TEXT NOT NULL,
+    medical_acts TEXT,
+    prescription TEXT,
+    consultation_date TIMESTAMP NOT NULL DEFAULT NOW(),
+    created_at  TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
 -- Table des logs d'accès (Test D ✅)
 CREATE TABLE IF NOT EXISTS access_logs (
     id          SERIAL PRIMARY KEY,
