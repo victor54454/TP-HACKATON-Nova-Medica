@@ -7,6 +7,7 @@
 #  Réseaux :
 #    frontend-net  → nginx <-> frontend-app <-> backend  (HTTP)
 #    backend-net   → backend <-> database   (privé, jamais exposé)
+#    monitoring-net → dozzle uniquement (isolé)
 #
 #  Hardening appliqué sur chaque service :
 #    - no-new-privileges : empêche l'escalade de privilèges
@@ -20,6 +21,9 @@ networks:
   backend-net:
     driver: bridge
     internal: true          # DB inaccessible depuis l'extérieur (Test A ✅)
+  monitoring-net:
+    driver: bridge
+    internal: true          # Dozzle isolé du reste de l'infra
 
 volumes:
   postgres-data:
@@ -94,7 +98,24 @@ services:
       - ALL
 
   # ----------------------------------------------------------
-  # 4. DATABASE — PostgreSQL (réseau interne uniquement)
+  # 4. DOZZLE — UI logs temps réel (port 8888)
+  # ----------------------------------------------------------
+  dozzle:
+    image: amir20/dozzle:latest
+    container_name: hsecure-dozzle
+    restart: unless-stopped
+    ports:
+      - "8888:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro   # lecture seule
+    environment:
+      - DOZZLE_FILTER=name=hsecure                     # affiche uniquement les containers H-Secure
+      - DOZZLE_LEVEL=info
+    security_opt:
+      - no-new-privileges:true
+
+  # ----------------------------------------------------------
+  # 5. DATABASE — PostgreSQL (réseau interne uniquement)
   # ----------------------------------------------------------
   database:
     image: postgres:15-alpine
