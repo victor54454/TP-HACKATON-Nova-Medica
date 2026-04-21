@@ -9,7 +9,7 @@ from passlib.context import CryptContext
 
 from config import settings
 from security import create_access_token, verify_token
-from schemas import PatientCreate, PatientResponse, TokenResponse
+from schemas import PatientCreate, PatientResponse, TokenResponse, RegisterRequest
 from crypto import encrypt, decrypt
 from logger import setup_logger, log_info, log_warn, log_error
 
@@ -101,7 +101,9 @@ async def list_patients(payload: dict = Depends(verify_token)):
     log_info("PATIENTS", f"List patients — user: {payload['sub']}")
 
     async with db_pool.acquire() as conn:
-        rows = await conn.fetch("SELECT * FROM patients ORDER BY id")
+        rows = await conn.fetch(
+            "SELECT * FROM patients WHERE created_by =$1 ORDER BY id ",
+            payload["user_id"])
 
     # Déchiffrement à la volée (les données brutes en DB sont illisibles → Test C ✅)
     return [
@@ -127,7 +129,15 @@ async def get_patient(patient_id: int, payload: dict = Depends(verify_token)):
         )
 
     if not row:
-        raise HTTPException(status_code=404, detail="Patient introuvable")
+        raise HTTPException(
+            status_code=404, 
+            detail="Patient introuvable"
+            )
+    if row["created_by"] != payload["user_id"]:
+        raise HTTPException(
+            status_code=403, 
+            detail="Accès refusé au patient demandé/Access denied — this patient does not belong to you"
+            )    
 
     return PatientResponse(
         id=row["id"],
@@ -177,3 +187,42 @@ async def create_patient(patient: PatientCreate, payload: dict = Depends(verify_
 @app.get("/health", tags=["Ops"])
 async def health():
     return {"status": "ok", "service": "H-Secure API"}
+
+
+# ══════════════════════════════════════════════════════════════
+#  REGISTER - Create a new user /Creer un nouvel utilisateur
+# ══════════════════════════════════════════════════════════════
+
+@app.post("/api/auth/register", status_code=201, tags=["Auth"])
+async def register(request: Request,user:RegisterRequest):
+   
+    ip = get_client_ip(request)
+
+    async with db_pool.acquire() as conn:
+
+        # Check if username already exists / Vérifier si le username existe déjà
+        existing = await conn.fetchrow(
+            "SELECT id FROM users WHERE username = $1",
+            user.username
+        )
+
+        if existing:
+            log_warn("REGISTER", f"Username already exists: {user.username} from IP {ip}")
+            raise HTTPException(
+                status_code=400,
+                detail="Ce nom d'utilisateur existe déjà / Username already exists"
+            )
+
+        # Hash password before saving / Hasher le mot de passe avant sauvegarde
+        hashed_password = pwd_context.hash(user.password)
+
+        # Save new user / Sauvegarder le nouvel utilisateur
+        await conn.execute(
+            "INSERT INTO users (username, password, role) VALUES ($1, $2, $3)",
+            user.username,
+            hashed_password,
+            user.role
+        )
+
+    log_info("REGISTER", f"New user created: {user.username} role: {user.role} from IP {ip}")
+    return {"message": f"Utilisateur {user.username} créé avec succès / User {user.username} created successfully"}

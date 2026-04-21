@@ -27,6 +27,15 @@ class LoginRequest(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+    
+    
+class RegisterRequest(BaseModel):
+    """
+    Schema for user registration / Schéma pour l'inscription utilisateur
+    """
+    username: str = Field(..., min_length=1, max_length=100)
+    password: str = Field(..., min_length=8, max_length=200)
+    role: str = Field(..., pattern="^(praticien|admin)$")
 
 
 # --- Patients ---

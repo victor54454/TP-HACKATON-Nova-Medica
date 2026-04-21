@@ -39,5 +39,5 @@ CREATE TABLE IF NOT EXISTS access_logs (
 -- Utilisateur de démo (mot de passe : "demo1234" hashé en bcrypt)
 -- À régénérer avec : python -c "import bcrypt; print(bcrypt.hashpw(b'demo1234', bcrypt.gensalt()).decode())"
 INSERT INTO users (username, password, role)
-VALUES ('admin', '$2b$12$PLACEHOLDER_HASH_TO_REPLACE', 'admin')
+VALUES ('admin', '$argon2id$v=19$m=65536,t=3,p=4$hhAi5Lz3nrM2prQWQiiFEA$qU8GMH4JzhyLHq3+6pa87D1zVSx6qkIFcq8ueyZk2zg', 'admin')
 ON CONFLICT (username) DO NOTHING;
