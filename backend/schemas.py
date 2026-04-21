@@ -27,12 +27,9 @@ class LoginRequest(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
-    
-    
+
+
 class RegisterRequest(BaseModel):
-    """
-    Schema for user registration / Schéma pour l'inscription utilisateur
-    """
     username: str = Field(..., min_length=1, max_length=100)
     password: str = Field(..., min_length=8, max_length=200)
     role: str = Field(..., pattern="^(praticien|admin)$")
@@ -41,10 +38,14 @@ class RegisterRequest(BaseModel):
 # --- Patients ---
 
 class PatientCreate(BaseModel):
-    first_name: str = Field(..., min_length=1, max_length=100)
-    last_name:  str = Field(..., min_length=1, max_length=100)
-    pathology:  Optional[str] = Field(None, max_length=500)
-    birth_date: Optional[date] = None
+    first_name:             str           = Field(..., min_length=1, max_length=100)
+    last_name:              str           = Field(..., min_length=1, max_length=100)
+    birth_date:             Optional[date]= None
+    phone_number:           Optional[str] = Field(None, max_length=20)
+    email_address:          Optional[str] = Field(None, max_length=254)
+    mail_address:           Optional[str] = Field(None, max_length=500)
+    social_security_number: Optional[str] = Field(None, max_length=50)
+    pathology:              Optional[str] = Field(None, max_length=500)
 
     @field_validator("first_name", "last_name")
     @classmethod
@@ -53,11 +54,15 @@ class PatientCreate(BaseModel):
 
 
 class PatientResponse(BaseModel):
-    id:         int
-    first_name: str
-    last_name:  str
-    pathology:  Optional[str]
-    birth_date: Optional[date]
+    id:                     int
+    first_name:             str
+    last_name:              str
+    birth_date:             Optional[date]
+    phone_number:           Optional[str]
+    email_address:          Optional[str]
+    mail_address:           Optional[str]
+    social_security_number: Optional[str]
+    pathology:              Optional[str]
 
     class Config:
         from_attributes = True

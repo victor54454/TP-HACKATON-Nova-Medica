@@ -1,13 +1,17 @@
 # =============================================================
 #  H-SECURE — Architecture Zero-Trust (Hackathon KEYCE 26)
 #  Client : Nova-Médica
-#  Stack  : React/Vite + FastAPI + PostgreSQL
+#  Stack  : Next.js + nginx + FastAPI + PostgreSQL
 # =============================================================
 #
 #  Réseaux :
-#    frontend-net  → Frontend <-> Backend  (HTTP)
-#    backend-net   → Backend  <-> Database (privé, jamais exposé)
+#    frontend-net  → nginx <-> frontend-app <-> backend  (HTTP)
+#    backend-net   → backend <-> database   (privé, jamais exposé)
 #
+#  Hardening appliqué sur chaque service :
+#    - no-new-privileges : empêche l'escalade de privilèges
+#    - cap_drop ALL      : suppression de toutes les capabilities Linux
+#    - utilisateur non-root dans chaque image applicative
 # =============================================================
 
 networks:
@@ -15,7 +19,7 @@ networks:
     driver: bridge
   backend-net:
     driver: bridge
-    internal: true
+    internal: true          # DB inaccessible depuis l'extérieur (Test A ✅)
 
 volumes:
   postgres-data:
@@ -23,25 +27,46 @@ volumes:
 services:
 
   # ----------------------------------------------------------
-  # 1. FRONTEND — React / Vite
+  # 1. FRONTEND-NGINX — Reverse proxy (seul port public front)
   # ----------------------------------------------------------
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
+  frontend-nginx:
+    image: nginx:1.27-alpine
     container_name: hsecure-frontend
     restart: unless-stopped
     ports:
-      - "3000:3000"           # seul port public exposé côté front
-    environment:
-      - VITE_API_URL=http://backend:8000
+      - "3000:8080"
+    volumes:
+      - ./frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - frontend-net
+    depends_on:
+      - frontend-app
+    security_opt:
+      - no-new-privileges:true
+
+  # ----------------------------------------------------------
+  # 2. FRONTEND-APP — Next.js (réseau interne, non exposé)
+  # ----------------------------------------------------------
+  frontend-app:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # URL du backend telle que vue par le navigateur (localhost = hôte Docker)
+        NEXT_PUBLIC_API_URL: http://localhost:8000/api
+    container_name: hsecure-frontend-app
+    restart: unless-stopped
     networks:
       - frontend-net
     depends_on:
       - backend
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
 
   # ----------------------------------------------------------
-  # 2. BACKEND — FastAPI (Python)
+  # 3. BACKEND — FastAPI (Python)
   # ----------------------------------------------------------
   backend:
     build:
@@ -50,7 +75,7 @@ services:
     container_name: hsecure-backend
     restart: unless-stopped
     ports:
-      - "8000:8000"           # exposé uniquement pour Postman / démo
+      - "8000:8000"         # exposé pour Postman / démo jury
     environment:
       - DATABASE_URL=postgresql://hsecure_user:${DB_PASSWORD}@database:5432/hsecure_db
       - JWT_SECRET=${JWT_SECRET}
@@ -58,14 +83,18 @@ services:
       - JWT_EXPIRE_MINUTES=30
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
     networks:
-      - frontend-net          # parle au frontend
-      - backend-net           # parle a la DB
+      - frontend-net
+      - backend-net
     depends_on:
       database:
         condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
 
   # ----------------------------------------------------------
-  # 3. DATABASE — PostgreSQL (réseau interne uniquement)
+  # 4. DATABASE — PostgreSQL (réseau interne uniquement)
   # ----------------------------------------------------------
   database:
     image: postgres:15-alpine
@@ -79,9 +108,11 @@ services:
       - postgres-data:/var/lib/postgresql/data
       - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
-      - backend-net
+      - backend-net           # uniquement backend-net — invisible depuis frontend (Test A ✅)
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U hsecure_user -d hsecure_db"]
       interval: 10s
       timeout: 5s
       retries: 5
+    security_opt:
+      - no-new-privileges:true

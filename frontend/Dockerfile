@@ -3,17 +3,32 @@ FROM dhi.io/node:20-alpine3.22-dev AS builder
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm install
+RUN npm ci
 
 COPY . .
+
+# Baked at build time — valeur injectée depuis docker-compose build args
+ARG NEXT_PUBLIC_API_URL=http://localhost:8000/api
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
 RUN npm run build
 
-# --- Image finale : nginx officiel (remplacer par dhi.io/nginx quand tag trouvé) ---
-FROM nginx:1.27-alpine
+# --- Image de production (non-root, minimal) ---
+FROM dhi.io/node:20-alpine3.22-dev AS runner
 
-COPY --from=builder /app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+WORKDIR /app
+
+ENV NODE_ENV=production
+
+RUN adduser -D -u 1001 nextjs
+
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+
+RUN chown -R nextjs:nextjs /app
+USER nextjs
 
 EXPOSE 3000
 
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["node", "server.js"]

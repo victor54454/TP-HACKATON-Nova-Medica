@@ -111,8 +111,12 @@ async def list_patients(payload: dict = Depends(verify_token)):
             id=r["id"],
             first_name=decrypt(r["first_name"]),
             last_name=decrypt(r["last_name"]),
-            pathology=decrypt(r["pathology"]) if r["pathology"] else None,
             birth_date=r["birth_date"],
+            phone_number=decrypt(r["phone_number"]) if r["phone_number"] else None,
+            email_address=decrypt(r["email_address"]) if r["email_address"] else None,
+            mail_address=decrypt(r["mail_address"]) if r["mail_address"] else None,
+            social_security_number=decrypt(r["social_security_number"]) if r["social_security_number"] else None,
+            pathology=decrypt(r["pathology"]) if r["pathology"] else None,
         )
         for r in rows
     ]
@@ -143,8 +147,12 @@ async def get_patient(patient_id: int, payload: dict = Depends(verify_token)):
         id=row["id"],
         first_name=decrypt(row["first_name"]),
         last_name=decrypt(row["last_name"]),
-        pathology=decrypt(row["pathology"]) if row["pathology"] else None,
         birth_date=row["birth_date"],
+        phone_number=decrypt(row["phone_number"]) if row["phone_number"] else None,
+        email_address=decrypt(row["email_address"]) if row["email_address"] else None,
+        mail_address=decrypt(row["mail_address"]) if row["mail_address"] else None,
+        social_security_number=decrypt(row["social_security_number"]) if row["social_security_number"] else None,
+        pathology=decrypt(row["pathology"]) if row["pathology"] else None,
     )
 
 
@@ -160,23 +168,35 @@ async def create_patient(patient: PatientCreate, payload: dict = Depends(verify_
     async with db_pool.acquire() as conn:
         row = await conn.fetchrow(
             """
-            INSERT INTO patients (first_name, last_name, pathology, birth_date, created_by)
-            VALUES ($1, $2, $3, $4, $5)
+            INSERT INTO patients (
+                first_name, last_name, birth_date,
+                phone_number, email_address, mail_address,
+                social_security_number, pathology, created_by
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             RETURNING *
             """,
-            encrypt(patient.first_name),   # ← chiffré ici
-            encrypt(patient.last_name),     # ← chiffré ici
-            encrypt(patient.pathology) if patient.pathology else None,
+            encrypt(patient.first_name),
+            encrypt(patient.last_name),
             patient.birth_date,
+            encrypt(patient.phone_number)           if patient.phone_number           else None,
+            encrypt(patient.email_address)          if patient.email_address          else None,
+            encrypt(patient.mail_address)           if patient.mail_address           else None,
+            encrypt(patient.social_security_number) if patient.social_security_number else None,
+            encrypt(patient.pathology)              if patient.pathology              else None,
             payload["user_id"],
         )
 
     return PatientResponse(
         id=row["id"],
-        first_name=patient.first_name,   # on retourne le clair à l'appelant
+        first_name=patient.first_name,
         last_name=patient.last_name,
-        pathology=patient.pathology,
         birth_date=row["birth_date"],
+        phone_number=patient.phone_number,
+        email_address=patient.email_address,
+        mail_address=patient.mail_address,
+        social_security_number=patient.social_security_number,
+        pathology=patient.pathology,
     )
 
 
@@ -269,23 +289,34 @@ async def update_patient(patient_id: int, patient: PatientCreate, payload: dict 
         row = await conn.fetchrow(
             """
             UPDATE patients
-            SET first_name = $1, last_name = $2, pathology = $3, birth_date = $4
-            WHERE id = $5
+            SET first_name = $1, last_name = $2, birth_date = $3,
+                phone_number = $4, email_address = $5, mail_address = $6,
+                social_security_number = $7, pathology = $8,
+                updated_at = NOW()
+            WHERE id = $9
             RETURNING *
             """,
-            encrypt(patient.first_name),   # ← chiffre ici / 
-            encrypt(patient.last_name),     # ← chiffré ici
-            encrypt(patient.pathology) if patient.pathology else None,
+            encrypt(patient.first_name),
+            encrypt(patient.last_name),
             patient.birth_date,
+            encrypt(patient.phone_number)           if patient.phone_number           else None,
+            encrypt(patient.email_address)          if patient.email_address          else None,
+            encrypt(patient.mail_address)           if patient.mail_address           else None,
+            encrypt(patient.social_security_number) if patient.social_security_number else None,
+            encrypt(patient.pathology)              if patient.pathology              else None,
             patient_id,
-        )   
+        )
     return PatientResponse(
         id=row["id"],
-        first_name=patient.first_name,   # on retourne le clair à l'appelant/ we return the clear text to the caller
+        first_name=patient.first_name,
         last_name=patient.last_name,
-        pathology=patient.pathology,
         birth_date=row["birth_date"],
-     )
+        phone_number=patient.phone_number,
+        email_address=patient.email_address,
+        mail_address=patient.mail_address,
+        social_security_number=patient.social_security_number,
+        pathology=patient.pathology,
+    )
     
 # ══════════════════════════════════════════════════════════════
 #  DELETE PATIENT

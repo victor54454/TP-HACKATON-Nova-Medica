@@ -14,18 +14,18 @@ CREATE TABLE IF NOT EXISTS users (
 
 
 CREATE TABLE IF NOT EXISTS patients (
-    id          SERIAL PRIMARY KEY,  
-    first_name  TEXT NOT NULL,           
-    last_name   TEXT NOT NULL,           
-    social_security_number TEXT,         
-    birth_date  DATE,
-    email_address TEXT,
-    phone_number TEXT, 
-    mail_address TEXT,
-    pathology   TEXT,                  
-    created_by  INTEGER REFERENCES users(id),
-    created_at  TIMESTAMP NOT NULL DEFAULT NOW(),
-    updated_at  TIMESTAMP NOT NULL DEFAULT NOW()
+    id                     SERIAL PRIMARY KEY,
+    first_name             TEXT NOT NULL,
+    last_name              TEXT NOT NULL,
+    social_security_number TEXT,
+    birth_date             DATE,
+    email_address          TEXT,
+    phone_number           TEXT,
+    mail_address           TEXT,
+    pathology              TEXT,
+    created_by             INTEGER REFERENCES users(id),
+    created_at             TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at             TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
 
