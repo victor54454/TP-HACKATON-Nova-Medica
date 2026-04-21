@@ -2,12 +2,10 @@
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useState, use } from 'react';
 import { useRouter } from 'next/navigation';
+import { createConsultation } from '@/services/api';
 import { useAuth } from '@/context/AuthContext';
 
-/**
- * Page de saisie d'une nouvelle consultation.
- * Accessible uniquement aux praticiens et administrateurs.
- */
+
 export default function NouvelleConsultation({ params }) {
     const router = useRouter();
     // Unwrapping de l'ID du patient depuis l'URL
@@ -18,23 +16,23 @@ export default function NouvelleConsultation({ params }) {
         anamnesis: '', diagnosis: '', medical_acts: '', prescription: ''
     });
 
-    /**
-     * Formulaire de consultation
-     */
+
     const handleSubmit = async (e) => {
         e.preventDefault();
-        
-        // Simulation d'envoi et de chiffrement
-        alert("Consultation enregistrée avec succès.");
-
-        // Retour au profil patient après enregistrement
-        router.push(`/patients/${patientId}`);
+        try {
+            // Appel API pour créer la consultation
+            await createConsultation(patientId, formData);
+            router.push(`/patients/${patientId}`);
+        } catch (error) {
+            console.error(error);
+            alert(error.message || "Erreur lors de l'enregistrement de la consultation.");
+        }
     };
 
     return (
         <ProtectedRoute allowedRoles={['praticien', 'admin']}>
             <div className="max-w-4xl mx-auto">
-                <h1 className="text-2xl font-bold mb-6 text-slate-900 leading-tight">Saisie de Consultation <br /><span className="text-blue-600">Dossier Patient N°{patientId}</span></h1>
+                <h1 className="text-2xl font-bold mb-6 text-slate-900 leading-tight">Saisie de consultation <br /><span className="text-blue-600">Dossier patient N°{patientId}</span></h1>
 
                 <form onSubmit={handleSubmit} className="space-y-6 bg-white p-8 rounded-2xl shadow-xl border border-slate-200">
                     {/* Champs de saisie avec labels clairs */}
@@ -59,7 +57,7 @@ export default function NouvelleConsultation({ params }) {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-2">Prescription et soins</label>
+                        <label className="block text-sm font-bold text-slate-700 mb-2">Ordonnance</label>
                         <textarea
                             rows="3"
                             className="w-full p-4 border rounded-xl bg-slate-50 focus:bg-white focus:ring-4 focus:ring-blue-100 outline-none transition-all"

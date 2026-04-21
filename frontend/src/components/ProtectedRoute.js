@@ -28,12 +28,12 @@ export default function ProtectedRoute({ children, allowedRoles = [] }) {
                     onClick={() => router.push('/dashboard')}
                     className="mt-6 text-sm font-bold text-rose-700 hover:underline"
                 >
-                    Retour au tableau de bord
+                    Dashboard
                 </button>
             </div>
         );
     }
 
-    // Si tout est valide, on rend les composants enfants
+    
     return children;
 }

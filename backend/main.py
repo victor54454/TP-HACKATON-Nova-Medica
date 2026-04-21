@@ -1,7 +1,7 @@
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Depends, HTTPException, Request, status
+from fastapi import FastAPI, Depends, HTTPException, Request, status, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 import asyncpg
@@ -11,7 +11,7 @@ from config import settings
 from security import create_access_token, verify_token, verify_reception_or_praticien
 from schemas import (
     PatientCreate, PatientResponse, TokenResponse, PatientUpdate, 
-    ConsultationCreate, ConsultationResponse
+    ConsultationCreate, ConsultationResponse, LoginRequest
 )
 from crypto import encrypt, decrypt
 from logger import setup_logger, log_info, log_warn, log_error
@@ -66,17 +66,17 @@ def get_client_ip(request: Request) -> str:
 
 # AUTH
 @app.post("/api/auth/login", response_model=TokenResponse, tags=["Auth"])
-async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends()):
-    ip = get_client_ip(request)
+async def login(login_data: LoginRequest = Body(...)):
+    global db_pool
 
     async with db_pool.acquire() as conn:
         user = await conn.fetchrow(
             "SELECT id, username, password, role FROM users WHERE username = $1",
-            form_data.username,
+            login_data.username,
         )
 
-    if not user or not pwd_context.verify(form_data.password, user["password"]):
-        log_warn("AUTH", f"Failed login attempt from IP {ip} — user: {form_data.username}")
+    if not user or not pwd_context.verify(login_data.password, user["password"]):
+        log_warn("AUTH", f"Failed login attempt — user: {login_data.username}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Identifiants de connexion incorrects",
@@ -84,14 +84,13 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
         )
 
     token = create_access_token({"sub": user["username"], "user_id": user["id"], "role": user["role"]})
-    log_info("AUTH", f"Access granted for user {user['username']} from IP {ip}")
+    log_info("AUTH", f"Access granted for user {user['username']}")
     return {"access_token": token, "token_type": "bearer"}
 
 
-# PATIENTS (Praticien / Full Access)
+# PATIENTS 
 @app.get("/api/patients", response_model=list[PatientResponse], tags=["Patients"])
 async def list_patients(payload: dict = Depends(verify_reception_or_praticien)):
-    # Seuls les praticiens voient la pathologie et le SSN
     is_praticien = payload.get("role") == "praticien"
     log_info("PATIENTS", f"List patients (is_praticien={is_praticien}) — user: {payload['sub']}")
 
@@ -232,7 +231,7 @@ async def delete_patient(patient_id: int, payload: dict = Depends(verify_recepti
     return None
 
 
-# Consultations accessible qu'aux praticiens
+# Consultations 
 @app.get("/api/patients/{patient_id}/consultations", response_model=list[ConsultationResponse], tags=["Consultations"])
 async def list_consultations(patient_id: int, payload: dict = Depends(verify_reception_or_praticien)):
     
@@ -270,7 +269,7 @@ async def create_consultation(patient_id: int, consultation: ConsultationCreate,
             patient_id,
             payload["user_id"],
             consultation.diagnosis,
-            consultation.date
+            consultation.date or date.today()
         )
         
     return ConsultationResponse(

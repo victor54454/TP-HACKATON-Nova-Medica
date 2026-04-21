@@ -13,17 +13,17 @@ export default function Dashboard() {
   // Liste des patients
   const [patients, setPatients] = useState([]);
 
-  // Terme de recherche actuel
+  // Terme de recherche
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
-    // Appel API réel sans mocks
+    // Appel API 
     getPatients()
       .then(data => setPatients(data))
       .catch(err => console.error("Erreur API Patients:", err));
   }, []);
 
-  // Filtrage des patients en fonction du nom ou du numéro de sécurité sociale
+  // Filtrage des patients 
   const filteredPatients = patients.filter(p =>
     p.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.social_security_number.includes(searchTerm)
@@ -34,7 +34,7 @@ export default function Dashboard() {
       {/* En-tête du tableau de bord */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-10">
         <div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Recherche Patient</h1>
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Recherche patient</h1>
           <p className="text-slate-500 font-medium">Gestion des dossiers médicaux</p>
         </div>
         <Link href="/patients/create" className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-lg shadow-emerald-900/10 active:scale-95">
@@ -48,7 +48,7 @@ export default function Dashboard() {
           <Search className="w-5 h-5 absolute left-5 top-5 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
           <input
             type="text"
-            placeholder="Rechercher par nom ou numéro de sécurité sociale..."
+            placeholder="Nom ou numéro de sécurité sociale."
             className="w-full pl-14 p-5 bg-slate-50 border-none rounded-xl focus:ring-0 outline-none font-medium text-slate-800 placeholder:text-slate-400"
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -106,6 +106,7 @@ export default function Dashboard() {
                   </td>
                 </tr>
               ))}
+
               {/* Message si aucun résultat n'est trouvé */}
               {filteredPatients.length === 0 && (
                 <tr>

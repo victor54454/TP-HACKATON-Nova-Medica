@@ -115,9 +115,9 @@ class UserResponse(BaseModel):
     role: str
 
 class ConsultationCreate(BaseModel):
-    date: date
+    date: Optional[date] = None
     diagnosis: str
-    doctor: str
+    doctor: Optional[str] = None
 
 class ConsultationResponse(BaseModel):
     id: int

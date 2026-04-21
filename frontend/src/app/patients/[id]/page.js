@@ -4,12 +4,9 @@ import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { Activity, Stethoscope } from 'lucide-react';
 import { useState, useEffect, use } from 'react';
-import { getPatientById, getConsultations } from '@/services/api';
+import { getPatientById, getConsultations, deletePatient } from '@/services/api';
 
-/**
- * Page de profil d'un patient.
- * Affiche les informations personnelles et l'historique médical.
- */
+
 export default function PatientProfile({ params }) {
     // Unwrapping des paramètres de l'URL
     const { id: patientId } = use(params);
@@ -29,7 +26,7 @@ export default function PatientProfile({ params }) {
                 setPatient(patientData);
                 setConsultations(consultationsData);
             } catch (error) {
-                console.error("Erreur lors du chargement des données patient:", error);
+                console.error("Erreur lors du chargement des données du patient:", error);
             } finally {
                 setLoading(false);
             }
@@ -46,21 +43,44 @@ export default function PatientProfile({ params }) {
             <div className="flex justify-between items-start mb-8">
                 <div>
                     <h1 className="text-3xl font-bold text-slate-800">{patient.last_name.toUpperCase()} {patient.first_name} </h1>
-                    <h3 className="text-slate-500 font-medium">{patient.address}</h3>
-                    <h3 className="text-slate-500 font-medium">{patient.email} | {patient.phone}</h3>
-                    <p className="text-slate-500 font-mono mt-1">N° Sécurité Sociale : {patient.social_security_number}
-                        <br /> Né(e) le : {patient.birth_date}</p>
+                    <p className="text-slate-500 font-mono mt-1">
+                        Adresse : {patient.address}
+                        <br /> Email : {patient.email}
+                        <br /> Téléphone : {patient.phone}
+                        <br /> N° Sécurité Sociale : {patient.social_security_number}
+                        <br /> Né(e) le : {patient.birth_date}
+                    </p>
 
                 </div>
-                {(user?.role === 'praticien' || user?.role === 'admin') && (
-                    <Link href={`/patients/${patientId}/consultation`} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition">
-                        <Stethoscope className="w-4 h-4" /> Nouvelle Consultation
-                    </Link>
-                )}
+                <div className="flex gap-2">
+                    {(user?.role === 'accueil' || user?.role === 'praticien' || user?.role === 'admin') && (
+                        <Link href={`/patients/${patientId}/edit`} className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg transition font-bold">
+                            Modifier le dossier
+                        </Link>
+                    )}
+                    {(user?.role === 'praticien') && (
+                        <button
+                            onClick={async () => {
+                                if (confirm("Voulez-vous vraiment supprimer ce patient ?")) {
+                                    await deletePatient(patientId);
+                                    router.push('/dashboard');
+                                }
+                            }}
+                            className="flex items-center gap-2 bg-red-50 hover:bg-red-100 text-red-600 px-4 py-2 rounded-lg transition font-bold"
+                        >
+                            Supprimer
+                        </button>
+                    )}
+                    {(user?.role === 'praticien') && (
+                        <Link href={`/patients/${patientId}/consultation`} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition font-bold shadow-sm">
+                            <Stethoscope className="w-4 h-4" /> Nouvelle consultation
+                        </Link>
+                    )}
+                </div>
             </div>
 
             {/*Historique Médical */}
-            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2"><Activity className="w-5 h-5 text-red-500" /> Historique Médical</h2>
+            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2"><Activity className="w-5 h-5 text-red-500" /> Historique médical</h2>
             <div className="space-y-4">
                 {consultations.map(consult => (
                     <div key={consult.id} className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 border-l-4 border-l-red-500">

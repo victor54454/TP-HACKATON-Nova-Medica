@@ -19,34 +19,34 @@ export default function CreatePatient() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      // Appel API réel
+      // Appel API 
       await createPatient(formData);
       router.push('/dashboard');
     } catch (error) {
       console.error(error);
-      alert("Erreur lors de la création du dossier.");
+      alert(error.message || "Erreur lors de la création du dossier.");
     }
   };
 
   return (
     <ProtectedRoute>
       <div className="max-w-2xl mx-auto">
-        <h1 className="text-2xl font-bold text-slate-800 mb-6">Nouveau Dossier Administratif</h1>
+        <h1 className="text-2xl font-bold text-slate-800 mb-6">Nouveau dossier administratif</h1>
         <form onSubmit={handleSubmit} className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-6">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium mb-1">Nom (last_name)</label>
+              <label className="block text-sm font-medium mb-1">Nom</label>
               <input type="text" className="w-full p-2 border rounded" required
                 onChange={e => setFormData({ ...formData, last_name: e.target.value })} />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Prénom (first_name)</label>
+              <label className="block text-sm font-medium mb-1">Prénom</label>
               <input type="text" className="w-full p-2 border rounded" required
                 onChange={e => setFormData({ ...formData, first_name: e.target.value })} />
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">N° Sécurité Sociale (Chiffré AES-256)</label>
+            <label className="block text-sm font-medium mb-1">N° Sécurité Sociale</label>
             <input type="text" className="w-full p-2 border rounded font-mono" required
               onChange={e => setFormData({ ...formData, social_security_number: e.target.value })} />
           </div>
@@ -56,7 +56,7 @@ export default function CreatePatient() {
               onChange={e => setFormData({ ...formData, birth_date: e.target.value })} />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Adresse e-mail</label>
+            <label className="block text-sm font-medium mb-1">Adresse mail</label>
             <input type="email" className="w-full p-2 border rounded" required
               onChange={e => setFormData({ ...formData, email: e.target.value })} />
           </div>
