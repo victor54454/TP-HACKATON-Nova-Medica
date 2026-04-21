@@ -20,10 +20,10 @@ networks:
     driver: bridge
   backend-net:
     driver: bridge
-    internal: true          # DB inaccessible depuis l'extérieur (Test A ✅)
+    internal: true 
   monitoring-net:
     driver: bridge
-    internal: true          # Dozzle isolé du reste de l'infra
+    #internal: true 
 
 volumes:
   postgres-data:
