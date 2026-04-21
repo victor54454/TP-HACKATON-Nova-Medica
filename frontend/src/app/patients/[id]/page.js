@@ -5,7 +5,12 @@ import { useAuth } from '@/context/AuthContext';
 import { Activity, Stethoscope } from 'lucide-react';
 import { use } from 'react';
 
+/**
+ * Page de profil d'un patient.
+ * Affiche les informations personnelles et l'historique médical.
+ */
 export default function PatientProfile({ params }) {
+    // Unwrapping des paramètres de l'URL
     const { id: patientId } = use(params);
     const { user } = useAuth();
 
@@ -17,6 +22,7 @@ export default function PatientProfile({ params }) {
 
     return (
         <ProtectedRoute>
+            {/* Profile patient avec bouton pour nouvelle consultation*/}
             <div className="flex justify-between items-start mb-8">
                 <div>
                     <h1 className="text-3xl font-bold text-slate-800">{patient.last_name.toUpperCase()} {patient.first_name}</h1>
@@ -30,6 +36,7 @@ export default function PatientProfile({ params }) {
                 )}
             </div>
 
+            {/*Historique Médical */}
             <h2 className="text-xl font-semibold mb-4 flex items-center gap-2"><Activity className="w-5 h-5 text-red-500" /> Historique Médical</h2>
             <div className="space-y-4">
                 {consultations.map(consult => (
@@ -42,6 +49,7 @@ export default function PatientProfile({ params }) {
                         <p className="text-slate-600 bg-slate-50 p-3 rounded mt-1">{consult.diagnosis}</p>
                     </div>
                 ))}
+                {/* Message si historique vide */}
                 {consultations.length === 0 && <p className="text-slate-500 italic">Aucune consultation enregistrée.</p>}
             </div>
         </ProtectedRoute>
