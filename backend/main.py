@@ -195,6 +195,11 @@ async def health():
 
 @app.post("/api/auth/register", status_code=201, tags=["Auth"])
 async def register(request: Request,user:RegisterRequest):
+    """ Crée un nouveau compte praticien ou admin.
+    Create a new doctor or admin account.
+    Vérifie que le username n'existe pas déjà.
+    Checks that username does not already exist."""
+    
    
     ip = get_client_ip(request)
 
@@ -226,3 +231,100 @@ async def register(request: Request,user:RegisterRequest):
 
     log_info("REGISTER", f"New user created: {user.username} role: {user.role} from IP {ip}")
     return {"message": f"Utilisateur {user.username} créé avec succès / User {user.username} created successfully"}
+
+# ══════════════════════════════════════════════════════════════
+#  UPDATE PATIENT
+# ═══════════════════════════════════════════════════════════════
+
+@app.put("/api/patients/{patient_id}", response_model=PatientResponse, tags=["Patients"])
+async def update_patient(patient_id: int, patient: PatientCreate, payload: dict = Depends(verify_token)):
+    """
+    Modifie un patient existant — JWT requis.
+    Update an existing patient — JWT required.
+    Seul le praticien qui a créé ce patient peut le modifier (protection IDOR).
+    Only the doctor who created this patient can update it (IDOR protection).
+    """
+    log_info("PATIENTS", f"Update patient {patient_id} — user: {payload['sub']}")
+
+    async with db_pool.acquire() as conn:
+        
+        # Check if patient exists / Vérifier si le patient existe
+        existing = await conn.fetchrow(
+            "SELECT * FROM patients WHERE id = $1", patient_id
+        )
+
+        if not existing:
+            raise HTTPException(
+                status_code=404, 
+                detail="Patient introuvable / Patient not found"
+                )
+        # Protection IDOR : check ownership / IDOR protection: vérifier la propriété du patient
+        if existing["created_by"] != payload["user_id"]:
+            raise HTTPException(
+                status_code=403, 
+                detail="Accès refusé au patient demandé/Access denied — this patient does not belong to you"
+                )    
+            
+        # Update patient / Mettre à jour le patient
+        row = await conn.fetchrow(
+            """
+            UPDATE patients
+            SET first_name = $1, last_name = $2, pathology = $3, birth_date = $4
+            WHERE id = $5
+            RETURNING *
+            """,
+            encrypt(patient.first_name),   # ← chiffre ici / 
+            encrypt(patient.last_name),     # ← chiffré ici
+            encrypt(patient.pathology) if patient.pathology else None,
+            patient.birth_date,
+            patient_id,
+        )   
+    return PatientResponse(
+        id=row["id"],
+        first_name=patient.first_name,   # on retourne le clair à l'appelant/ we return the clear text to the caller
+        last_name=patient.last_name,
+        pathology=patient.pathology,
+        birth_date=row["birth_date"],
+     )
+    
+# ══════════════════════════════════════════════════════════════
+#  DELETE PATIENT
+# ══════════════════════════════════════════════════════════════
+
+@app.delete("/api/patients/{patient_id}", tags=["Patients"])
+async def delete_patient(patient_id: int, payload: dict = Depends(verify_token)):
+    """
+    Supprime un patient existant — JWT requis.
+    Delete an existing patient — JWT required.
+    Seul le praticien qui a créé ce patient peut le supprimer (protection IDOR).
+    Only the doctor who created this patient can delete it (IDOR protection).
+    """
+    log_info("PATIENTS", f"Delete patient {patient_id} — user: {payload['sub']}")
+
+    async with db_pool.acquire() as conn:
+        
+        # Check if patient exists / Vérifier si le patient existe
+        existing = await conn.fetchrow(
+            "SELECT * FROM patients WHERE id = $1", patient_id
+        )
+
+        if not existing:
+            raise HTTPException(
+                status_code=404, 
+                detail="Patient introuvable / Patient not found"
+                )
+        # Protection IDOR : check ownership / IDOR protection: vérifier la propriété du patient
+        if existing["created_by"] != payload["user_id"]:
+            raise HTTPException(
+                status_code=403, 
+                detail="Accès refusé au patient demandé/Access denied — this patient does not belong to you"
+                )    
+            
+        # Delete patient / Supprimer le patient
+        await conn.execute(
+            "DELETE FROM patients WHERE id = $1",
+            patient_id
+        )
+        
+    log_info("PATIENTS", f"Patient {patient_id} deleted by user: {payload['sub']}")
+    return {"message": f"Patient supprimé avec succès / Patient deleted successfully"}
