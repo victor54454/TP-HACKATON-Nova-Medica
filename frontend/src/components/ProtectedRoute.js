@@ -30,6 +30,8 @@ export default function ProtectedRoute({ children, allowedRoles = [] }) {
         return null;
     }
 
+    if (!user) return null;
+
     if (
         allowedRoles.length > 0 &&
         !allowedRoles.includes(user.role)
