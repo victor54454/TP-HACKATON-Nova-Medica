@@ -32,7 +32,6 @@ class TokenResponse(BaseModel):
 class RegisterRequest(BaseModel):
     username: str = Field(..., min_length=1, max_length=100)
     password: str = Field(..., min_length=8, max_length=200)
-    role: str = Field(..., pattern="^(praticien|admin)$")
 
 
 # --- Patients ---

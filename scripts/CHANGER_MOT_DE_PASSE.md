@@ -1,37 +1,27 @@
 # Changer le mot de passe admin
 
-## Étape 1 — Générer le hash
+## Étape 1 — Générer le hash et l'injecter en DB
 
 **Option A — En local (recommandé) :**
+
 ```bash
-./scripts/generate_password_hash.sh TonNouveauMotDePasse
+HASH=$(python3 scripts/generate_password_hash.py TonNouveauMotDePasse)
+docker exec hsecure-database psql -U hsecure_user -d hsecure_db \
+  -c "UPDATE users SET password='$HASH' WHERE username='admin';"
 ```
-Le script crée automatiquement un environnement Python isolé dans `/tmp` la première fois.
 
 **Option B — Via le container Docker :**
-```bash
-docker cp scripts/generate_password_hash.py hsecure-backend:/tmp/generate_password_hash.py
-docker exec hsecure-backend python3 /tmp/generate_password_hash.py TonNouveauMotDePasse
-```
-
-Tu obtiens une ligne qui ressemble à ça (elle sera différente à chaque fois, c'est normal) :
-
-```
-$argon2id$v=19$m=65536,t=3,p=4$XXXX...
-```
-
-Copie ce hash.
-
----
-
-## Cas 1 — La DB est en marche (containers Docker actifs)
-
-Lance cette commande en remplaçant `COLLE_LE_HASH_ICI` par le hash généré ci-dessus :
 
 ```bash
+docker cp scripts/generate_password_hash.py hsecure-backend:/tmp/gen.py
+HASH=$(docker exec hsecure-backend python3 /tmp/gen.py TonNouveauMotDePasse)
 docker exec hsecure-database psql -U hsecure_user -d hsecure_db \
-  -c "UPDATE users SET password='COLLE_LE_HASH_ICI' WHERE username='admin';"
+  -c "UPDATE users SET password='$HASH' WHERE username='admin';"
 ```
+
+> ⚠️ Ne copie-colle jamais le hash directement dans une commande shell.  
+> Les `$` qu'il contient seraient interprétés par bash et le hash serait mutilé.  
+> La variable `$HASH` évite ça — bash fait le transfert lui-même.
 
 Le changement est immédiat, pas besoin de redémarrer.
 
@@ -39,17 +29,24 @@ Le changement est immédiat, pas besoin de redémarrer.
 
 ## Cas 2 — La DB n'existe pas encore (premier démarrage)
 
-Ouvre le fichier `database/init.sql` et remplace la ligne suivante :
+Génère le hash et affiche-le :
 
-```sql
-VALUES ('admin', '$argon2id$...ancien hash...', 'admin')
+```bash
+python3 scripts/generate_password_hash.py TonNouveauMotDePasse
 ```
 
-par :
+Copie la sortie et remplace dans `database/init.sql` :
 
 ```sql
+-- Avant
+VALUES ('admin', '$argon2id$...ancien hash...', 'admin')
+
+-- Après
 VALUES ('admin', '$argon2id$...nouveau hash...', 'admin')
 ```
+
+> ✅ Dans `init.sql`, le copier-coller est OK — c'est du SQL brut, pas du bash.  
+> Les `$` ne sont pas interprétés.
 
 Puis lance les containers :
 
@@ -59,12 +56,11 @@ docker compose up -d
 
 ---
 
-## Cas 3 — Remettre la DB à zéro (repart de zéro)
+## Cas 3 — Remettre la DB à zéro
 
 ```bash
 # Arrête et supprime le volume de la DB
 docker compose down -v
-
 # Recrée tout (init.sql sera rejoué)
 docker compose up -d
 ```

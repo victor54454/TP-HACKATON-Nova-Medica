@@ -34,7 +34,7 @@ services:
   # 1. FRONTEND-NGINX — Reverse proxy (seul port public front)
   # ----------------------------------------------------------
   frontend-nginx:
-    image: nginx:1.27-alpine
+    image: dhi.io/nginx:1.30-debian12
     container_name: hsecure-frontend
     restart: unless-stopped
     ports:
@@ -49,6 +49,13 @@ services:
       - frontend-app
     security_opt:
       - no-new-privileges:true
+    cap_drop:
+      - ALL
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: "0.25"
 
   # ----------------------------------------------------------
   # 2. FRONTEND-APP — Next.js (réseau interne, non exposé)
@@ -70,6 +77,11 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.50"
 
   # ----------------------------------------------------------
   # 3. BACKEND — FastAPI (Python)
@@ -98,6 +110,11 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.50"
 
   # ----------------------------------------------------------
   # 4. DOZZLE — UI logs temps réel (port 8888)
@@ -115,6 +132,13 @@ services:
       - DOZZLE_LEVEL=info
     security_opt:
       - no-new-privileges:true
+    cap_drop:
+      - ALL
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+          cpus: "0.10"
     networks:
       - monitoring-net
 
@@ -143,3 +167,16 @@ services:
       retries: 5
     security_opt:
       - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
+      - FOWNER
+      - DAC_OVERRIDE
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.50"

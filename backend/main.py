@@ -45,8 +45,9 @@ app = FastAPI(
     title="H-Secure API — Nova-Médica",
     version="1.0.0",
     lifespan=lifespan,
-    docs_url="/docs",
+    docs_url=None,
     redoc_url=None,
+    openapi_url=None,
 )
 
 app.state.limiter = limiter
@@ -267,12 +268,12 @@ async def register(request: Request, user: RegisterRequest):
         # Hash password before saving / Hasher le mot de passe avant sauvegarde
         hashed_password = pwd_context.hash(user.password)
 
-        # Save new user / Sauvegarder le nouvel utilisateur
+        # Save new user — role forcé à "praticien" (admin créé uniquement via DB)
         new_row = await conn.fetchrow(
             "INSERT INTO users (username, password, role) VALUES ($1, $2, $3) RETURNING id",
             user.username,
             hashed_password,
-            user.role
+            "praticien",
         )
 
     log_info("REGISTER", f"New user created: {user.username} role: {user.role} from IP {ip}")
