@@ -7,7 +7,7 @@
 CREATE TABLE IF NOT EXISTS users (
     id          SERIAL PRIMARY KEY,
     username    VARCHAR(100) NOT NULL UNIQUE,
-    password    VARCHAR(255) NOT NULL,  
+    password    TEXT NOT NULL,    -- Argon2/bcrypt hash
     role        VARCHAR(50)  NOT NULL DEFAULT 'praticien',
     must_change_password BOOLEAN NOT NULL DEFAULT TRUE,
     created_at  TIMESTAMP    NOT NULL DEFAULT NOW()
@@ -30,33 +30,6 @@ CREATE TABLE IF NOT EXISTS patients (
 );
 
 
-CREATE TABLE IF NOT EXISTS consultations (
-    id          SERIAL PRIMARY KEY,
-    patient_id  INTEGER REFERENCES patients(id) ON DELETE CASCADE,
-    doctor_id   INTEGER REFERENCES users(id),
-    consultation_date TIMESTAMP NOT NULL DEFAULT NOW(),
-    anamnesis    TEXT,  
-    diagnosis    TEXT,  
-    medical_acts TEXT,  
-    prescription TEXT,  
-    created_at  TIMESTAMP NOT NULL DEFAULT NOW(),
-    updated_at  TIMESTAMP NOT NULL DEFAULT NOW()
-);
-
--- Table des consultations médicales
-CREATE TABLE IF NOT EXISTS consultations (
-    id          SERIAL PRIMARY KEY,
-    patient_id  INTEGER NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
-    praticien_id   INTEGER NOT NULL REFERENCES users(id),
-    -- Champs chiffres AES-256 / AES-256 encrypted fields
-    anamnesis TEXT NOT NULL,
-    diagnosis TEXT NOT NULL,
-    medical_acts TEXT,
-    prescription TEXT,
-    consultation_date TIMESTAMP NOT NULL DEFAULT NOW(),
-    created_at  TIMESTAMP NOT NULL DEFAULT NOW()
-);
-
 -- Table des logs d'accès (Test D ✅)
 CREATE TABLE IF NOT EXISTS access_logs (
     id          SERIAL PRIMARY KEY,
@@ -69,5 +42,5 @@ CREATE TABLE IF NOT EXISTS access_logs (
 );
 
 INSERT INTO users (username, password, role)
-VALUES ('admin', '$argon2id$v=19$m=65536,t=3,p=4$YmU4OWI5MThkNDEyZGYyNA$w9hW3tKq6U/7n/F0/m9jZg', 'admin')
+VALUES ('admin', '$argon2id$v=19$m=65536,t=3,p=4$U4oxBqD0/l+rldLa2xvDGA$H7d2ySKBE5h0excXDiYpzMYpH7Zv6dFwA/+92z/ixJE', 'admin')
 ON CONFLICT (username) DO NOTHING;

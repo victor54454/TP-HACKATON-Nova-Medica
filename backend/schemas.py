@@ -17,6 +17,24 @@ def _validate_name(v: str) -> str:
         )
     return v.strip()
 
+def _validate_password(v: str) -> str:
+    """
+    Valide les mots de passe pour s'assurer qu'ils sont suffisamment complexes
+    Validates that password meets security requirements:
+    """
+    if len(v) < 12:
+        raise ValueError("Le mot de passe doit comporter au moins 12 caractères/The password must be at least 12 characters long")
+    if not re.search(r"[A-Z]", v):
+        raise ValueError("Le mot de passe doit contenir au moins une lettre majuscule/The password must contain at least one uppercase letter")
+    if not re.search(r"[a-z]", v):
+        raise ValueError("Le mot de passe doit contenir au moins une lettre minuscule/The password must contain at least one lowercase letter")
+    if not re.search(r"[0-9]", v):
+        raise ValueError("Le mot de passe doit contenir au moins un chiffre/The password must contain at least one digit")
+    if not re.search(r"[@$!%*?&]", v):
+        raise ValueError("Le mot de passe doit contenir au moins un caractère spécial (@$!%*?&)/The password must contain at least one special character (@$!%*?&)")
+    return v
+
+
 
 # --- Auth ---
 
@@ -33,12 +51,23 @@ class TokenResponse(BaseModel):
 
 class RegisterRequest(BaseModel):
     username: str = Field(..., min_length=1, max_length=100)
-    password: str = Field(..., min_length=8, max_length=200)
+    password: str = Field(..., min_length=12, max_length=200)
     role: str = Field(..., pattern="^(praticien|admin)$")
+    
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, v):
+        return _validate_password(v)
 
 
 class PasswordChangeRequest(BaseModel):
-    new_password: str = Field(..., min_length=8, max_length=200)
+    """Schéma pour la demande de changement de mot de passe/Schema for password change request"""
+    new_password: str = Field(..., min_length=12, max_length=200)
+    
+    @field_validator("new_password")
+    @classmethod
+    def validate_new_password(cls, v):
+        return _validate_password(v)
 
 
 # --- Patients ---
@@ -113,13 +142,23 @@ class PatientResponse(BaseModel):
 
 class UserCreate(BaseModel):
     username: str = Field(..., min_length=3, max_length=100)
-    password: str = Field(..., min_length=8)
+    password: str = Field(..., min_length=12)
     role: str
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, v):
+        return _validate_password(v)
 
 class UserUpdate(BaseModel):
     username: Optional[str] = Field(None, min_length=3, max_length=100)
-    password: Optional[str] = Field(None, min_length=8)
+    password: Optional[str] = Field(None, min_length=12)
     role: Optional[str] = None
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, v):
+        if v is not None:
+            return _validate_password(v)
+        return v
 
 class UserResponse(BaseModel):
     id: int
