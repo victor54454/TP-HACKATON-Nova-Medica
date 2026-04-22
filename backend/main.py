@@ -1,19 +1,23 @@
 # backend/main.py
 import os
 from contextlib import asynccontextmanager
-from datetime import date
+from datetime import date, datetime
 
 from fastapi import FastAPI, Depends, HTTPException, Request, status, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 import asyncpg
 from passlib.context import CryptContext
 
 from config import settings
 from security import create_access_token, verify_token, verify_reception_or_praticien
 from schemas import (
-    PatientCreate, PatientResponse, TokenResponse, PatientUpdate, 
-    ConsultationCreate, ConsultationResponse, LoginRequest, PasswordChangeRequest
+    PatientCreate, PatientResponse, TokenResponse, PatientUpdate,
+    ConsultationCreate, ConsultationResponse, LoginRequest, PasswordChangeRequest,
+    RegisterRequest
 )
 from crypto import encrypt, decrypt
 from logger import setup_logger, log_info, log_warn, log_error
@@ -21,6 +25,9 @@ import routers.admin as admin
 import routers.reception as reception
 
 
+limiter = Limiter(key_func=get_remote_address)
+
+# ── Init logger ────────────────────────────────────────────────
 os.makedirs("/app/logs", exist_ok=True)
 setup_logger()
 
@@ -50,14 +57,18 @@ app = FastAPI(
     lifespan=lifespan,
     docs_url="/docs",
     redoc_url=None,
+    openapi_url=None,
 )
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["https://localhost"],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 
@@ -66,19 +77,43 @@ def get_client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
-# AUTH
+async def write_access_log(user_id, action: str, ip: str, log_status: str, detail: str = None):
+    try:
+        async with db_pool.acquire() as conn:
+            await conn.execute(
+                "INSERT INTO access_logs (user_id, action, ip_address, status, detail) VALUES ($1, $2, $3, $4, $5)",
+                user_id, action, ip, log_status, detail,
+            )
+    except Exception:
+        pass
+
+
+# ══════════════════════════════════════════════════════════════
+#  AUTH
+# ══════════════════════════════════════════════════════════════
+
 @app.post("/api/auth/login", response_model=TokenResponse, tags=["Auth"])
-async def login(login_data: LoginRequest = Body(...)):
-    global db_pool
+@limiter.limit("10/minute")
+async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends()):
+    """
+    Authentification — retourne un JWT valide 30 min.
+    Log [INFO] si succès, [WARN] si échec (Test D ✅)
+    Limité à 10 tentatives/minute par IP.
+    """
+    ip = get_client_ip(request)
 
     async with db_pool.acquire() as conn:
         user = await conn.fetchrow(
             "SELECT id, username, password, role, must_change_password FROM users WHERE username = $1",
-            login_data.username,
+            form_data.username,
         )
 
-    if not user or not pwd_context.verify(login_data.password, user["password"]):
-        log_warn("AUTH", f"Failed login attempt — user: {login_data.username}")
+    if not user or not pwd_context.verify(form_data.password, user["password"]):
+        log_warn("AUTH", f"Failed login attempt from IP {ip} — user: {form_data.username}")
+        await write_access_log(
+            user["id"] if user else None, "LOGIN", ip, "FAILURE",
+            f"Bad credentials for username: {form_data.username}"
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Identifiants de connexion incorrects",
@@ -86,13 +121,14 @@ async def login(login_data: LoginRequest = Body(...)):
         )
 
     token = create_access_token({"sub": user["username"], "user_id": user["id"], "role": user["role"]})
-    log_info("AUTH", f"Access granted for user {user['username']}")
+    log_info("AUTH", f"Access granted for user {user['username']} from IP {ip}")
+    await write_access_log(user["id"], "LOGIN", ip, "SUCCESS", f"User {user['username']} authenticated")
+
     return {
         "access_token": token, 
         "token_type": "bearer", 
         "must_change_password": user["must_change_password"]
     }
-
 
 @app.post("/api/auth/change-password", tags=["Auth"])
 async def change_password(
@@ -193,6 +229,7 @@ async def create_patient(patient: PatientCreate, payload: dict = Depends(verify_
             payload["user_id"],
         )
 
+    await write_access_log(payload["user_id"], "CREATE_PATIENT", "internal", "SUCCESS", f"Patient id={row['id']}")
     return PatientResponse(
         id=row["id"],
         first_name=patient.first_name,
@@ -282,9 +319,10 @@ async def list_consultations(patient_id: int, payload: dict = Depends(verify_rec
     return [
         ConsultationResponse(
             id=r["id"],
-            date=r["consultation_date"].date(),
+            consultation_date=r["consultation_date"],
             anamnesis=r["anamnesis"] if is_praticien else None,
             diagnosis=r["diagnosis"] if is_praticien else "Accès réservé au praticien",
+            medical_acts=r["medical_acts"] if is_praticien else None,
             prescription=r["prescription"] if is_praticien else None,
             doctor=r["doctor_name"],
             patient_id=r["patient_id"]
@@ -300,23 +338,27 @@ async def create_consultation(patient_id: int, consultation: ConsultationCreate,
     async with db_pool.acquire() as conn:
         row = await conn.fetchrow(
             """
-            INSERT INTO consultations (patient_id, doctor_id, anamnesis, diagnosis, prescription, consultation_date)
-            VALUES ($1, $2, $3, $4, $5, $6)
+            INSERT INTO consultations (patient_id, doctor_id, anamnesis, diagnosis, medical_acts, prescription, consultation_date)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *
             """,
             patient_id,
             payload["user_id"],
             consultation.anamnesis,
             consultation.diagnosis,
+            consultation.medical_acts,
             consultation.prescription,
-            consultation.date or date.today()
+            consultation.consultation_date or datetime.now()
         )
-        
+
     return ConsultationResponse(
         id=row["id"],
-        date=row["consultation_date"].date(),
+        consultation_date=row["consultation_date"],
+        anamnesis=row["anamnesis"],
         diagnosis=row["diagnosis"],
-        doctor=payload["sub"], 
+        medical_acts=row["medical_acts"],
+        prescription=row["prescription"],
+        doctor=payload["sub"],
         patient_id=row["patient_id"]
     )
 
@@ -328,3 +370,156 @@ async def health():
 
 app.include_router(admin.router)    
 app.include_router(reception.router)
+# ══════════════════════════════════════════════════════════════
+#  REGISTER - Create a new user /Creer un nouvel utilisateur
+# ══════════════════════════════════════════════════════════════
+
+@app.post("/api/auth/register", status_code=201, tags=["Auth"])
+@limiter.limit("5/minute")
+async def register(request: Request, user: RegisterRequest):
+    """ Crée un nouveau compte praticien ou admin.
+    Create a new doctor or admin account.
+    Vérifie que le username n'existe pas déjà.
+    Checks that username does not already exist."""
+    
+   
+    ip = get_client_ip(request)
+
+    async with db_pool.acquire() as conn:
+
+        # Check if username already exists / Vérifier si le username existe déjà
+        existing = await conn.fetchrow(
+            "SELECT id FROM users WHERE username = $1",
+            user.username
+        )
+
+        if existing:
+            log_warn("REGISTER", f"Username already exists: {user.username} from IP {ip}")
+            raise HTTPException(
+                status_code=400,
+                detail="Ce nom d'utilisateur existe déjà / Username already exists"
+            )
+
+        # Hash password before saving / Hasher le mot de passe avant sauvegarde
+        hashed_password = pwd_context.hash(user.password)
+
+        # Save new user — role forcé à "praticien" (admin créé uniquement via DB)
+        new_row = await conn.fetchrow(
+            "INSERT INTO users (username, password, role) VALUES ($1, $2, $3) RETURNING id",
+            user.username,
+            hashed_password,
+            "praticien",
+        )
+
+    log_info("REGISTER", f"New user created: {user.username} role: {user.role} from IP {ip}")
+    await write_access_log(new_row["id"], "REGISTER", ip, "SUCCESS", f"New user: {user.username}")
+    return {"message": f"Utilisateur {user.username} créé avec succès / User {user.username} created successfully"}
+
+# ══════════════════════════════════════════════════════════════
+#  UPDATE PATIENT
+# ═══════════════════════════════════════════════════════════════
+
+@app.put("/api/patients/{patient_id}", response_model=PatientResponse, tags=["Patients"])
+async def update_patient(patient_id: int, patient: PatientCreate, payload: dict = Depends(verify_token)):
+    """
+    Modifie un patient existant — JWT requis.
+    Update an existing patient — JWT required.
+    Seul le praticien qui a créé ce patient peut le modifier (protection IDOR).
+    Only the doctor who created this patient can update it (IDOR protection).
+    """
+    log_info("PATIENTS", f"Update patient {patient_id} — user: {payload['sub']}")
+
+    async with db_pool.acquire() as conn:
+        
+        # Check if patient exists / Vérifier si le patient existe
+        existing = await conn.fetchrow(
+            "SELECT * FROM patients WHERE id = $1", patient_id
+        )
+
+        if not existing:
+            raise HTTPException(
+                status_code=404, 
+                detail="Patient introuvable / Patient not found"
+                )
+        # Protection IDOR : check ownership / IDOR protection: vérifier la propriété du patient
+        if existing["created_by"] != payload["user_id"]:
+            raise HTTPException(
+                status_code=403, 
+                detail="Accès refusé au patient demandé/Access denied — this patient does not belong to you"
+                )    
+            
+        # Update patient / Mettre à jour le patient
+        row = await conn.fetchrow(
+            """
+            UPDATE patients
+            SET first_name = $1, last_name = $2, birth_date = $3,
+                phone_number = $4, email_address = $5, mail_address = $6,
+                social_security_number = $7, pathology = $8,
+                updated_at = NOW()
+            WHERE id = $9
+            RETURNING *
+            """,
+            encrypt(patient.first_name),
+            encrypt(patient.last_name),
+            patient.birth_date,
+            encrypt(patient.phone_number)           if patient.phone_number           else None,
+            encrypt(patient.email_address)          if patient.email_address          else None,
+            encrypt(patient.mail_address)           if patient.mail_address           else None,
+            encrypt(patient.social_security_number) if patient.social_security_number else None,
+            encrypt(patient.pathology)              if patient.pathology              else None,
+            patient_id,
+        )
+    return PatientResponse(
+        id=row["id"],
+        first_name=patient.first_name,
+        last_name=patient.last_name,
+        birth_date=row["birth_date"],
+        phone_number=patient.phone_number,
+        email_address=patient.email_address,
+        mail_address=patient.mail_address,
+        social_security_number=patient.social_security_number,
+        pathology=patient.pathology,
+    )
+    
+# ══════════════════════════════════════════════════════════════
+#  DELETE PATIENT
+# ══════════════════════════════════════════════════════════════
+
+@app.delete("/api/patients/{patient_id}", tags=["Patients"])
+async def delete_patient(patient_id: int, payload: dict = Depends(verify_token)):
+    """
+    Supprime un patient existant — JWT requis.
+    Delete an existing patient — JWT required.
+    Seul le praticien qui a créé ce patient peut le supprimer (protection IDOR).
+    Only the doctor who created this patient can delete it (IDOR protection).
+    """
+    log_info("PATIENTS", f"Delete patient {patient_id} — user: {payload['sub']}")
+
+    async with db_pool.acquire() as conn:
+        
+        # Check if patient exists / Vérifier si le patient existe
+        existing = await conn.fetchrow(
+            "SELECT * FROM patients WHERE id = $1", patient_id
+        )
+
+        if not existing:
+            raise HTTPException(
+                status_code=404, 
+                detail="Patient introuvable / Patient not found"
+                )
+        # Protection IDOR : check ownership / IDOR protection: vérifier la propriété du patient
+        if existing["created_by"] != payload["user_id"]:
+            raise HTTPException(
+                status_code=403, 
+                detail="Accès refusé au patient demandé/Access denied — this patient does not belong to you"
+                )    
+            
+        # Delete patient / Supprimer le patient
+        await conn.execute(
+            "DELETE FROM patients WHERE id = $1",
+            patient_id
+        )
+        
+    log_info("PATIENTS", f"Patient {patient_id} deleted by user: {payload['sub']}")
+    await write_access_log(payload["user_id"], "DELETE_PATIENT", "internal", "SUCCESS", f"Patient id={patient_id}")
+    return {"message": f"Patient supprimé avec succès / Patient deleted successfully"}

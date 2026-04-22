@@ -1,6 +1,6 @@
 # backend/schemas.py
 import re
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Optional
 from pydantic import BaseModel, field_validator, Field, EmailStr
 
@@ -81,6 +81,16 @@ class PatientReceptionCreate(BaseModel):
     phone: Optional[str] = Field(None, max_length=20)
     email: Optional[EmailStr] = Field(None, max_length=254)
 
+    @field_validator("birth_date")
+    @classmethod
+    def validate_birth_date(cls, v):
+        today = date.today()
+        if v > today:
+            raise ValueError("La date de naissance ne peut pas être dans le futur")
+        if (today - v).days > 130 * 365:
+            raise ValueError("L'âge du patient ne peut pas dépasser 130 ans")
+        return v
+
     @field_validator("first_name", "last_name")
     @classmethod
     def validate_names(cls, v):
@@ -109,6 +119,17 @@ class PatientUpdate(BaseModel):
     email: Optional[EmailStr] = Field(None, max_length=254)
     pathology: Optional[str] = Field(None, max_length=500)
 
+    @field_validator("birth_date")
+    @classmethod
+    def validate_birth_date(cls, v):
+        if v is not None:
+            today = date.today()
+            if v > today:
+                raise ValueError("La date de naissance ne peut pas être dans le futur")
+            if (today - v).days > 130 * 365:
+                raise ValueError("L'âge du patient ne peut pas dépasser 130 ans")
+        return v
+
     @field_validator("first_name", "last_name")
     @classmethod
     def validate_names(cls, v):
@@ -119,9 +140,9 @@ class PatientUpdate(BaseModel):
     @field_validator("social_security_number")
     @classmethod
     def validate_ssn(cls, v):
-        if v is not None and not _SSN_REGEX.match(v):
+        if v is not None and v != "" and not _SSN_REGEX.match(v):
             raise ValueError("Le numéro de sécurité sociale doit contenir exactement 15 chiffres")
-        return v
+        return v or None
 
 class PatientResponse(BaseModel):
     id:         int
@@ -168,22 +189,22 @@ class UserResponse(BaseModel):
 
 #Consultation
 class ConsultationCreate(BaseModel):
-    date: Optional[date] = None
+    consultation_date: Optional[datetime] = None
     anamnesis: Optional[str] = None
-    diagnosis: str
+    diagnosis: Optional[str] = None
+    medical_acts: Optional[str] = None
     prescription: Optional[str] = None
-    doctor: Optional[str] = None
 
 
 class ConsultationResponse(BaseModel):
     id: int
-    date: date
+    consultation_date: datetime
     anamnesis: Optional[str] = None
-    diagnosis: str
+    diagnosis: Optional[str] = None
+    medical_acts: Optional[str] = None
     prescription: Optional[str] = None
     doctor: str
     patient_id: int
-
 
     class Config:
         from_attributes = True
