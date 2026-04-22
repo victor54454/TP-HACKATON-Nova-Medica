@@ -29,7 +29,7 @@ def test_api():
         "first_name": "Jean",
         "last_name": "Dupont",
         "birth_date": "1980-01-01",
-        "social_security_number": "1800101123456",
+        "social_security_number": "180010112345600",
         "address": "123 Rue de Paris",
         "phone": "0123456789",
         "email": "jean.dupont@example.com"
@@ -68,7 +68,7 @@ def test_api():
     # 7. Admin: User CRUD
     print("\n--- 7. Testing Admin: Create/Delete User ---")
     headers_adm = {"Authorization": f"Bearer {tokens['admin']}"}
-    new_user = {"username": "temp_user", "password": "password123", "role": "accueil"}
+    new_user = {"username": "temp_user", "password": "Temp@Password1!", "role": "accueil"}
     resp = requests.post(f"{BASE_URL}/api/admin/users", json=new_user, headers=headers_adm)
     print(f"Admin Create User: {resp.status_code}")
     

@@ -7,7 +7,7 @@
 CREATE TABLE IF NOT EXISTS users (
     id          SERIAL PRIMARY KEY,
     username    VARCHAR(100) NOT NULL UNIQUE,
-    password    VARCHAR(255) NOT NULL,  
+    password    TEXT NOT NULL,    -- Argon2/bcrypt hash
     role        VARCHAR(50)  NOT NULL DEFAULT 'praticien',
     must_change_password BOOLEAN NOT NULL DEFAULT TRUE,
     created_at  TIMESTAMP    NOT NULL DEFAULT NOW()
@@ -30,18 +30,7 @@ CREATE TABLE IF NOT EXISTS patients (
 );
 
 
-CREATE TABLE IF NOT EXISTS consultations (
-    id          SERIAL PRIMARY KEY,
-    patient_id  INTEGER REFERENCES patients(id) ON DELETE CASCADE,
-    doctor_id   INTEGER REFERENCES users(id),
-    consultation_date TIMESTAMP NOT NULL DEFAULT NOW(),
-    anamnesis    TEXT,  
-    diagnosis    TEXT,  
-    medical_acts TEXT,  
-    prescription TEXT,  
-    created_at  TIMESTAMP NOT NULL DEFAULT NOW(),
-    updated_at  TIMESTAMP NOT NULL DEFAULT NOW()
-);
+-- Table des logs d'accès (Test D ✅)
 CREATE TABLE IF NOT EXISTS access_logs (
     id          SERIAL PRIMARY KEY,
     user_id     INTEGER REFERENCES users(id),
@@ -53,5 +42,22 @@ CREATE TABLE IF NOT EXISTS access_logs (
 );
 
 INSERT INTO users (username, password, role)
-VALUES ('admin', '$argon2id$v=19$m=65536,t=3,p=4$YmU4OWI5MThkNDEyZGYyNA$w9hW3tKq6U/7n/F0/m9jZg', 'admin')
+VALUES ('admin', '$argon2id$v=19$m=65536,t=3,p=4$33vPGSOk1FrLWcv5H6P0vg$In7r06WI85Kb3EHkM/L+n+ZtP6FP/F/h6m883EVacVQ', 'admin')
 ON CONFLICT (username) DO NOTHING;
+
+INSERT INTO users (username, password, role)
+VALUES ('victor', '$argon2id$v=19$m=65536,t=3,p=4$33vPGSOk1FrLWcv5H6P0vg$In7r06WI85Kb3EHkM/L+n+ZtP6FP/F/h6m883EVacVQ', 'victor')
+ON CONFLICT (username) DO NOTHING;
+
+-- ================================================================
+--  Principe du moindre privilège — droits restreints pour hsecure_user
+--  (l'utilisateur applicatif ne peut PAS supprimer des utilisateurs
+--   ni accéder aux séquences internes hors nécessité)
+-- ================================================================
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE patients       TO hsecure_user;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE consultations  TO hsecure_user;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE access_logs    TO hsecure_user;
+GRANT SELECT, INSERT, UPDATE          ON TABLE users         TO hsecure_user;
+REVOKE DELETE                          ON TABLE users         FROM hsecure_user;
+
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO hsecure_user;
