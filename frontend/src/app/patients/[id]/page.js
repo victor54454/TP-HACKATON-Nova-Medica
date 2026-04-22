@@ -1,8 +1,9 @@
 'use client';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { Activity, Stethoscope } from 'lucide-react';
+import { Activity, Stethoscope, Shield } from 'lucide-react';
 import { useState, useEffect, use } from 'react';
 import { getPatientById, getConsultations, deletePatient } from '@/services/api';
 
@@ -11,20 +12,22 @@ export default function PatientProfile({ params }) {
     // Unwrapping des paramètres de l'URL
     const { id: patientId } = use(params);
     const { user } = useAuth();
+    const router = useRouter();
 
     const [patient, setPatient] = useState(null);
     const [consultations, setConsultations] = useState([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        if (user === null) return;
         const fetchData = async () => {
             try {
-                const [patientData, consultationsData] = await Promise.all([
-                    getPatientById(patientId),
-                    getConsultations(patientId)
-                ]);
+                const patientData = await getPatientById(patientId);
                 setPatient(patientData);
-                setConsultations(consultationsData);
+                if (user?.role === 'praticien') {
+                    const consultationsData = await getConsultations(patientId);
+                    setConsultations(consultationsData);
+                }
             } catch (error) {
                 console.error("Erreur lors du chargement des données du patient:", error);
             } finally {
@@ -32,7 +35,7 @@ export default function PatientProfile({ params }) {
             }
         };
         fetchData();
-    }, [patientId]);
+    }, [patientId, user]);
 
     if (loading) return <div className="p-10 text-center font-bold">Chargement du dossier...</div>;
     if (!patient) return <div className="p-10 text-center font-bold text-red-500">Patient introuvable.</div>;
@@ -58,7 +61,7 @@ export default function PatientProfile({ params }) {
                             Modifier le dossier
                         </Link>
                     )}
-                    {(user?.role === 'praticien') && (
+                    {(user?.role === 'praticien' || user?.role === 'accueil') && (
                         <button
                             onClick={async () => {
                                 if (confirm("Voulez-vous vraiment supprimer ce patient ?")) {
@@ -79,22 +82,49 @@ export default function PatientProfile({ params }) {
                 </div>
             </div>
 
-            {/*Historique Médical */}
-            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2"><Activity className="w-5 h-5 text-red-500" /> Historique médical</h2>
-            <div className="space-y-4">
-                {consultations.map(consult => (
-                    <div key={consult.id} className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 border-l-4 border-l-red-500">
-                        <div className="flex justify-between text-sm text-slate-500 mb-2">
-                            <span>Date : {consult.date}</span>
-                            <span>Praticien : {consult.doctor}</span>
-                        </div>
-                        <p className="font-medium text-slate-800 mt-2">Diagnostic :</p>
-                        <p className="text-slate-600 bg-slate-50 p-3 rounded mt-1">{consult.diagnosis}</p>
+            {/* Données de santé — réservé au praticien */}
+            {user?.role === 'praticien' && patient.pathology && (
+                <div className="bg-red-50 border border-red-100 rounded-2xl p-6 mb-8">
+                    <h2 className="text-lg font-bold text-red-800 mb-2 flex items-center gap-2">
+                        <Shield className="w-5 h-5 text-red-600" /> Pathologie
+                    </h2>
+                    <p className="text-red-900">{patient.pathology}</p>
+                </div>
+            )}
+
+            {/*Historique Médical — réservé aux praticiens */}
+            {user?.role === 'praticien' && (
+                <>
+                    <h2 className="text-xl font-semibold mb-4 flex items-center gap-2"><Activity className="w-5 h-5 text-red-500" /> Historique médical</h2>
+                    <div className="space-y-4">
+                        {consultations.map(consult => (
+                            <div key={consult.id} className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 border-l-4 border-l-red-500 space-y-3">
+                                <div className="flex justify-between text-sm text-slate-500">
+                                    <span>Date : {consult.date}</span>
+                                    <span>Praticien : {consult.doctor}</span>
+                                </div>
+                                {consult.anamnesis && (
+                                    <div>
+                                        <p className="font-medium text-slate-800">Anamnèse :</p>
+                                        <p className="text-slate-600 bg-slate-50 p-3 rounded mt-1">{consult.anamnesis}</p>
+                                    </div>
+                                )}
+                                <div>
+                                    <p className="font-medium text-slate-800">Diagnostic :</p>
+                                    <p className="text-slate-600 bg-slate-50 p-3 rounded mt-1">{consult.diagnosis}</p>
+                                </div>
+                                {consult.prescription && (
+                                    <div>
+                                        <p className="font-medium text-slate-800">Ordonnance :</p>
+                                        <p className="text-slate-600 bg-slate-50 p-3 rounded mt-1">{consult.prescription}</p>
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                        {consultations.length === 0 && <p className="text-slate-500 italic">Aucune consultation enregistrée.</p>}
                     </div>
-                ))}
-                {/* Message si historique vide */}
-                {consultations.length === 0 && <p className="text-slate-500 italic">Aucune consultation enregistrée.</p>}
-            </div>
+                </>
+            )}
         </ProtectedRoute>
     );
 }

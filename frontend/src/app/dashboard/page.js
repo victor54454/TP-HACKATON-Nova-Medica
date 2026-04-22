@@ -2,26 +2,27 @@
 import ProtectedRoute from '@/components/ProtectedRoute';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
 import { getPatients } from '@/services/api';
 import { Search, UserPlus, FileText, ChevronRight } from 'lucide-react';
 
-/**
- * Composant Dashboard.
- * Affiche la liste des patients et barre derecherche.
- */
 export default function Dashboard() {
-  // Liste des patients
+  const { user } = useAuth();
+  const router = useRouter();
   const [patients, setPatients] = useState([]);
-
-  // Terme de recherche
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
-    // Appel API 
+    if (user === null) return;
+    if (user?.role === 'admin') {
+      router.replace('/admin');
+      return;
+    }
     getPatients()
       .then(data => setPatients(data))
       .catch(err => console.error("Erreur API Patients:", err));
-  }, []);
+  }, [user]);
 
   // Filtrage des patients 
   const filteredPatients = patients.filter(p =>

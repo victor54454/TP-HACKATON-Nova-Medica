@@ -51,7 +51,7 @@ export default function LoginPage() {
                         <div className="bg-blue-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner border border-blue-100">
                             <ShieldAlert className="w-10 h-10 text-blue-600" />
                         </div>
-                        <h1 className="text-3xl font-black text-slate-900 tracking-tight">Connexion sécurisée [DEBUG: APP_V2]</h1>
+                        <h1 className="text-3xl font-black text-slate-900 tracking-tight">Connexion sécurisée</h1>
                         <p className="text-slate-500 font-medium mt-2">Portail professionnel Nova Médica</p>
                     </div>
 

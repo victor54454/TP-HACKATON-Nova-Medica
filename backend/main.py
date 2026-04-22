@@ -1,5 +1,6 @@
 import os
 from contextlib import asynccontextmanager
+from datetime import date
 
 from fastapi import FastAPI, Depends, HTTPException, Request, status, Body
 from fastapi.middleware.cors import CORSMiddleware
@@ -218,7 +219,7 @@ async def update_patient(patient_id: int, patient_update: PatientUpdate, payload
 
 @app.delete("/api/patients/{patient_id}", status_code=204, tags=["Patients"])
 async def delete_patient(patient_id: int, payload: dict = Depends(verify_reception_or_praticien)):
-    if payload.get("role") != "praticien":
+    if payload.get("role") not in ("praticien", "accueil"):
         raise HTTPException(status_code=403, detail="Rôle non autorisé")
         
     log_info("PATIENTS", f"Delete patient {patient_id} — user: {payload['sub']}")
@@ -247,7 +248,9 @@ async def list_consultations(patient_id: int, payload: dict = Depends(verify_rec
         ConsultationResponse(
             id=r["id"],
             date=r["consultation_date"].date(),
-            diagnosis=r["diagnosis"] if is_praticien else "Confisqué (Accès réservé)",
+            anamnesis=r["anamnesis"] if is_praticien else None,
+            diagnosis=r["diagnosis"] if is_praticien else "Accès réservé au praticien",
+            prescription=r["prescription"] if is_praticien else None,
             doctor=r["doctor_name"],
             patient_id=r["patient_id"]
         )
@@ -262,13 +265,15 @@ async def create_consultation(patient_id: int, consultation: ConsultationCreate,
     async with db_pool.acquire() as conn:
         row = await conn.fetchrow(
             """
-            INSERT INTO consultations (patient_id, doctor_id, diagnosis, consultation_date)
-            VALUES ($1, $2, $3, $4)
+            INSERT INTO consultations (patient_id, doctor_id, anamnesis, diagnosis, prescription, consultation_date)
+            VALUES ($1, $2, $3, $4, $5, $6)
             RETURNING *
             """,
             patient_id,
             payload["user_id"],
+            consultation.anamnesis,
             consultation.diagnosis,
+            consultation.prescription,
             consultation.date or date.today()
         )
         

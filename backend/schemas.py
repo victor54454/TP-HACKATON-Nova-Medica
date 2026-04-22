@@ -116,15 +116,19 @@ class UserResponse(BaseModel):
 
 class ConsultationCreate(BaseModel):
     date: Optional[date] = None
+    anamnesis: Optional[str] = None
     diagnosis: str
+    prescription: Optional[str] = None
     doctor: Optional[str] = None
 
 class ConsultationResponse(BaseModel):
     id: int
     date: date
+    anamnesis: Optional[str] = None
     diagnosis: str
+    prescription: Optional[str] = None
     doctor: str
     patient_id: int
-    
+
     class Config:
         from_attributes = True
