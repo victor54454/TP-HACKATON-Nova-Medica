@@ -1,3 +1,4 @@
+# backend/schemas.py
 import re
 from datetime import date
 from typing import Optional
@@ -119,6 +120,25 @@ class UserResponse(BaseModel):
     id: int
     username: str
     role: str
+
+
+#Consultation
+class ConsultationCreate(BaseModel):
+    date: Optional[date] = None
+    anamnesis: Optional[str] = None
+    diagnosis: str
+    prescription: Optional[str] = None
+    doctor: Optional[str] = None
+
+
+class ConsultationResponse(BaseModel):
+    id: int
+    date: date
+    anamnesis: Optional[str] = None
+    diagnosis: str
+    prescription: Optional[str] = None
+    doctor: str
+    patient_id: int
 
 
     class Config:
