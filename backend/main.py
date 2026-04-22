@@ -13,7 +13,7 @@ from config import settings
 from security import create_access_token, verify_token, verify_reception_or_praticien
 from schemas import (
     PatientCreate, PatientResponse, TokenResponse, PatientUpdate, 
-    ConsultationCreate, ConsultationResponse, LoginRequest
+    ConsultationCreate, ConsultationResponse, LoginRequest, PasswordChangeRequest
 )
 from crypto import encrypt, decrypt
 from logger import setup_logger, log_info, log_warn, log_error
@@ -73,7 +73,7 @@ async def login(login_data: LoginRequest = Body(...)):
 
     async with db_pool.acquire() as conn:
         user = await conn.fetchrow(
-            "SELECT id, username, password, role FROM users WHERE username = $1",
+            "SELECT id, username, password, role, must_change_password FROM users WHERE username = $1",
             login_data.username,
         )
 
@@ -87,7 +87,29 @@ async def login(login_data: LoginRequest = Body(...)):
 
     token = create_access_token({"sub": user["username"], "user_id": user["id"], "role": user["role"]})
     log_info("AUTH", f"Access granted for user {user['username']}")
-    return {"access_token": token, "token_type": "bearer"}
+    return {
+        "access_token": token, 
+        "token_type": "bearer", 
+        "must_change_password": user["must_change_password"]
+    }
+
+
+@app.post("/api/auth/change-password", tags=["Auth"])
+async def change_password(
+    data: PasswordChangeRequest, 
+    payload: dict = Depends(verify_token)
+):
+    user_id = payload.get("user_id")
+    hashed_pwd = pwd_context.hash(data.new_password)
+    
+    async with db_pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE users SET password = $1, must_change_password = FALSE WHERE id = $2",
+            hashed_pwd, user_id
+        )
+        
+    log_info("AUTH", f"Password changed for user {payload['sub']}")
+    return {"message": "Mot de passe mis à jour avec succès"}
 
 
 # PATIENTS 
@@ -97,9 +119,9 @@ async def list_patients(payload: dict = Depends(verify_reception_or_praticien)):
     log_info("PATIENTS", f"List patients (is_praticien={is_praticien}) — user: {payload['sub']}")
 
     async with db_pool.acquire() as conn:
-        rows = await conn.fetch(
-            "SELECT * FROM patients WHERE created_by =$1 ORDER BY id ",
-            payload["user_id"])
+        rows = await conn.fetch("SELECT * FROM patients ORDER BY id ")
+        
+    log_info("PATIENTS", f"[DEBUG] {len(rows)} patients trouvés dans la base pour l'utilisateur {payload['sub']}")
 
     return [
         PatientResponse(
@@ -130,11 +152,7 @@ async def get_patient(patient_id: int, payload: dict = Depends(verify_reception_
             status_code=404, 
             detail="Patient introuvable"
             )
-    if row["created_by"] != payload["user_id"]:
-        raise HTTPException(
-            status_code=403, 
-            detail="Accès refusé au patient demandé/Access denied — this patient does not belong to you"
-            )    
+    
 
     return PatientResponse(
         id=row["id"],
@@ -251,7 +269,13 @@ async def list_consultations(patient_id: int, payload: dict = Depends(verify_rec
     
     async with db_pool.acquire() as conn:
         rows = await conn.fetch(
-            "SELECT c.*, u.username as doctor_name FROM consultations c JOIN users u ON c.doctor_id = u.id WHERE c.patient_id = $1 ORDER BY c.consultation_date DESC",
+            """
+            SELECT c.*, u.username as doctor_name 
+            FROM consultations c 
+            JOIN users u ON c.doctor_id = u.id 
+            WHERE c.patient_id = $1 
+            ORDER BY c.consultation_date DESC
+            """,
             patient_id
         )
 

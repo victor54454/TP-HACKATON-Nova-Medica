@@ -22,6 +22,19 @@ export const loginUser = async (username, password) => {
     return response.json();
 };
 
+export const changePassword = async (newPassword) => {
+    const response = await fetch(`${API_URL}/api/auth/change-password`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ new_password: newPassword })
+    });
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Erreur lors du changement de mot de passe');
+    }
+    return response.json();
+};
+
 // Patients
 export const getPatients = async () => {
     const response = await fetch(`${API_URL}/api/patients`, { headers: getAuthHeaders() });

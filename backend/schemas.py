@@ -28,12 +28,17 @@ class LoginRequest(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+    must_change_password: bool = False
 
 
 class RegisterRequest(BaseModel):
     username: str = Field(..., min_length=1, max_length=100)
     password: str = Field(..., min_length=8, max_length=200)
     role: str = Field(..., pattern="^(praticien|admin)$")
+
+
+class PasswordChangeRequest(BaseModel):
+    new_password: str = Field(..., min_length=8, max_length=200)
 
 
 # --- Patients ---

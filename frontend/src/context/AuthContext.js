@@ -28,13 +28,16 @@ export const AuthProvider = ({ children }) => {
     }, []);
 
     // Connexion
-    const login = (token) => {
+    const login = (token, mustChange) => {
         localStorage.setItem('token', token);
         const decoded = jwtDecode(token);
         setUser({ username: decoded.sub || decoded.username, role: decoded.role });
 
-         // Retour à la page d'accueil
-        router.push('/dashboard');
+        if (mustChange) {
+            router.push('/change-password');
+        } else {
+            router.push('/dashboard');
+        }
     };
 
     // Déconnexion
@@ -42,7 +45,7 @@ export const AuthProvider = ({ children }) => {
         localStorage.removeItem('token');
         setUser(null);
         // Retour à la page de connexion
-        router.push('/login'); 
+        router.push('/login');
     };
 
     return (
