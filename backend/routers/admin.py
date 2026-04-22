@@ -23,7 +23,7 @@ async def create_user(
     async with pool.acquire() as conn:
         try:
             await conn.execute(
-                "INSERT INTO users (username, password, role) VALUES ($1, $2, $3)",
+                "INSERT INTO users (username, password, role, must_change_password) VALUES ($1, $2, $3, TRUE)",
                 user.username, hashed_pwd, user.role
             )
             log_info("ADMIN", f"Utilisateur {user.username} créé avec le rôle {user.role} par {payload['sub']}")

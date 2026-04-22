@@ -30,7 +30,7 @@ export default function LoginPage() {
             // Appel API 
 
             const data = await loginUser(username, password);
-            login(data.access_token);
+            login(data.access_token, data.must_change_password);
 
 
         } catch (err) {
