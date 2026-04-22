@@ -13,10 +13,13 @@ const getAuthHeaders = () => {
 
 // Authentification
 export const loginUser = async (username, password) => {
-    const response = await fetch(`${API_URL}/api/auth/login`, {
+    const body = new URLSearchParams();
+    body.append('username', username);
+    body.append('password', password);
+    const response = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body.toString()
     });
     if (!response.ok) throw new Error('Identifiants invalides');
     return response.json();

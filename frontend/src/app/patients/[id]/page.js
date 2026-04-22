@@ -9,7 +9,6 @@ import { getPatientById, getConsultations, deletePatient } from '@/services/api'
 
 
 export default function PatientProfile({ params }) {
-    // Unwrapping des paramètres de l'URL
     const { id: patientId } = use(params);
     const { user } = useAuth();
     const router = useRouter();

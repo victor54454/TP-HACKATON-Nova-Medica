@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { loginUser } from '@/services/api';
 import { ShieldAlert } from 'lucide-react';
 import { loginUser } from '@/services/api';
 

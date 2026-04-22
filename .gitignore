@@ -15,3 +15,6 @@ dist/
 
 # Docker volumes locaux
 postgres-data/
+
+# Dumps chiffrés
+backups/*.gpg
