@@ -29,6 +29,12 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
 
 
+class RegisterRequest(BaseModel):
+    username: str = Field(..., min_length=1, max_length=100)
+    password: str = Field(..., min_length=8, max_length=200)
+    role: str = Field(..., pattern="^(praticien|admin)$")
+
+
 # --- Patients ---
 
 class PatientReceptionCreate(BaseModel):
@@ -36,9 +42,9 @@ class PatientReceptionCreate(BaseModel):
     last_name:  str = Field(..., min_length=1, max_length=100)
     birth_date: date
     social_security_number: str
-    address: Optional[str] = None
-    phone: Optional[str] = None
-    email: Optional[EmailStr] = None
+    address: Optional[str] = Field(None, max_length=500)
+    phone: Optional[str] = Field(None, max_length=20)
+    email: Optional[EmailStr] = Field(None, max_length=254)
 
     @field_validator("first_name", "last_name")
     @classmethod
@@ -63,9 +69,9 @@ class PatientUpdate(BaseModel):
     last_name:  Optional[str] = Field(None, min_length=1, max_length=100)
     birth_date: Optional[date] = None
     social_security_number: Optional[str] = None
-    address: Optional[str] = None
-    phone: Optional[str] = None
-    email: Optional[EmailStr] = None
+    address: Optional[str] = Field(None, max_length=500)
+    phone: Optional[str] = Field(None, max_length=20)
+    email: Optional[EmailStr] = Field(None, max_length=254)
     pathology: Optional[str] = Field(None, max_length=500)
 
     @field_validator("first_name", "last_name")
@@ -114,21 +120,6 @@ class UserResponse(BaseModel):
     username: str
     role: str
 
-class ConsultationCreate(BaseModel):
-    date: Optional[date] = None
-    anamnesis: Optional[str] = None
-    diagnosis: str
-    prescription: Optional[str] = None
-    doctor: Optional[str] = None
-
-class ConsultationResponse(BaseModel):
-    id: int
-    date: date
-    anamnesis: Optional[str] = None
-    diagnosis: str
-    prescription: Optional[str] = None
-    doctor: str
-    patient_id: int
 
     class Config:
         from_attributes = True

@@ -1,0 +1,475 @@
+openapi: 3.0.3
+info:
+  title: H-Secure API
+  version: 1.0.0
+  description: >
+    API for authentication and patient management system.
+    / API pour l'authentification et la gestion des patients.
+    Built for Nova-Medica clinic as part of H-Secure infrastructure project.
+    / Construite pour la clinique Nova-Medica dans le cadre du projet H-Secure.
+    All patient data is encrypted with AES-256 before storage.
+    / Toutes les données patients sont chiffrées avec AES-256 avant stockage.
+
+servers:
+  - url: http://localhost:8000/docs
+
+tags:
+  - name: Auth
+    description: Login and register / Connexion et inscription
+  - name: Patients
+    description: Patient management / Gestion des patients
+  - name: Admin
+    description: Admin only routes / Routes réservées aux admins
+
+components:
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >
+        Get your token from POST /auth/login.
+        / Obtenez votre token depuis POST /auth/login.
+        Send it as: Authorization Bearer your_token_here
+        / Envoyez-le comme: Authorization Bearer votre_token_ici
+
+  schemas:
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "Something went wrong. / Une erreur s'est produite."
+      required:
+        - error
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        username:
+          type: string
+          example: "doctor_dupont"
+        role:
+          type: string
+          enum: [praticien, admin]
+          example: "praticien"
+
+    AuthResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        token_type:
+          type: string
+          example: "bearer"
+
+    RegisterRequest:
+      type: object
+      required: [username, password, role]
+      properties:
+        username:
+          type: string
+          example: "doctor_dupont"
+        password:
+          type: string
+          example: "SecurePass123!"
+        role:
+          type: string
+          enum: [praticien, admin]
+          example: "praticien"
+
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          example: "doctor_dupont"
+        password:
+          type: string
+          example: "SecurePass123!"
+
+    Patient:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        first_name:
+          type: string
+          example: "Jean"
+        last_name:
+          type: string
+          example: "Dupont"
+        pathology:
+          type: string
+          example: "Diabetes type 2"
+        birth_date:
+          type: string
+          format: date
+          example: "1985-03-15"
+
+    PatientCreateRequest:
+      type: object
+      required: [first_name, last_name, birth_date]
+      properties:
+        first_name:
+          type: string
+          example: "Jean"
+        last_name:
+          type: string
+          example: "Dupont"
+        pathology:
+          type: string
+          example: "Diabetes type 2"
+        birth_date:
+          type: string
+          format: date
+          example: "1985-03-15"
+
+    PatientUpdateRequest:
+      type: object
+      required: [first_name, last_name, birth_date]
+      properties:
+        first_name:
+          type: string
+          example: "Jean"
+        last_name:
+          type: string
+          example: "Dupont"
+        pathology:
+          type: string
+          example: "Diabetes type 1"
+        birth_date:
+          type: string
+          format: date
+          example: "1985-03-15"
+
+    PatientListResponse:
+      type: object
+      properties:
+        patients:
+          type: array
+          items:
+            $ref: '#/components/schemas/Patient'
+
+    UserListResponse:
+      type: object
+      properties:
+        users:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid token / Token manquant ou invalide
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: "Token invalide ou expiré"
+
+    Forbidden:
+      description: Access denied / Accès refusé
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: "Accès refusé"
+
+    NotFound:
+      description: Resource not found / Ressource introuvable
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: "Patient introuvable"
+
+    ServerError:
+      description: Internal server error / Erreur interne du serveur
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: "Erreur serveur"
+
+security:
+  - bearerAuth: []
+
+paths:
+
+  /auth/register:
+    post:
+      tags: [Auth]
+      security: []
+      summary: Register a new user / Créer un nouvel utilisateur
+      description: >
+        Creates a new doctor or admin account.
+        / Crée un nouveau compte praticien ou admin.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: User created / Utilisateur créé
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+              example:
+                message: "Utilisateur créé avec succès"
+        '400':
+          description: Bad request / Mauvaise requête
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      security: []
+      summary: Login / Connexion
+      description: >
+        Send username and password, receive JWT token valid 30 minutes.
+        / Envoyez username et password, recevez un token JWT valide 30 minutes.
+        Use this token in all protected requests.
+        / Utilisez ce token dans toutes les requêtes protégées.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful / Connexion réussie
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Wrong credentials / Identifiants incorrects
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /patients:
+    get:
+      tags: [Patients]
+      summary: Get all patients / Récupérer tous les patients
+      description: >
+        Returns only patients created by the logged-in doctor. (IDOR protection)
+        / Retourne uniquement les patients créés par le praticien connecté. (Protection IDOR)
+      responses:
+        '200':
+          description: List of patients / Liste des patients
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatientListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+    post:
+      tags: [Patients]
+      summary: Create patient / Créer un patient
+      description: >
+        Creates a new patient. Name and pathology are encrypted with AES-256.
+        / Crée un nouveau patient. Nom et pathologie sont chiffrés avec AES-256.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatientCreateRequest'
+      responses:
+        '201':
+          description: Patient created / Patient créé
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Patient'
+        '400':
+          description: Invalid request / Requête invalide
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /patients/{id}:
+    get:
+      tags: [Patients]
+      summary: Get one patient / Récupérer un patient
+      description: >
+        Returns a single patient. Returns 403 if patient belongs to another doctor.
+        / Retourne un seul patient. Retourne 403 si le patient appartient à un autre praticien.
+        This is the IDOR fix. / C'est la correction IDOR.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: Patient found / Patient trouvé
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Patient'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+    put:
+      tags: [Patients]
+      summary: Update patient / Modifier un patient
+      description: >
+        Updates patient data. Only the doctor who created this patient can update it.
+        / Modifie les données d'un patient. Seul le praticien qui a créé ce patient peut le modifier.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatientUpdateRequest'
+      responses:
+        '200':
+          description: Patient updated / Patient modifié
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Patient mis à jour avec succès"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+    delete:
+      tags: [Patients]
+      summary: Delete patient / Supprimer un patient
+      description: >
+        Deletes a patient. Only the doctor who created this patient can delete it.
+        / Supprime un patient. Seul le praticien qui a créé ce patient peut le supprimer.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: Patient deleted / Patient supprimé
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Patient supprimé avec succès"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /admin/patients:
+    get:
+      tags: [Admin]
+      summary: Get ALL patients (admin only) / Tous les patients (admin uniquement)
+      description: >
+        Admin can see every patient from every doctor.
+        / L'admin peut voir tous les patients de tous les praticiens.
+        Returns 403 if non-admin tries this route.
+        / Retourne 403 si un non-admin essaie cette route.
+      responses:
+        '200':
+          description: All patients / Tous les patients
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatientListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /admin/users:
+    get:
+      tags: [Admin]
+      summary: Get all users (admin only) / Tous les utilisateurs (admin uniquement)
+      description: >
+        Returns list of all registered users.
+        / Retourne la liste de tous les utilisateurs enregistrés.
+        Only accessible by admin role.
+        / Accessible uniquement par le rôle admin.
+      responses:
+        '200':
+          description: List of users / Liste des utilisateurs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServerError'

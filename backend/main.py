@@ -96,7 +96,9 @@ async def list_patients(payload: dict = Depends(verify_reception_or_praticien)):
     log_info("PATIENTS", f"List patients (is_praticien={is_praticien}) — user: {payload['sub']}")
 
     async with db_pool.acquire() as conn:
-        rows = await conn.fetch("SELECT * FROM patients ORDER BY last_name")
+        rows = await conn.fetch(
+            "SELECT * FROM patients WHERE created_by =$1 ORDER BY id ",
+            payload["user_id"])
 
     return [
         PatientResponse(
@@ -123,7 +125,15 @@ async def get_patient(patient_id: int, payload: dict = Depends(verify_reception_
         row = await conn.fetchrow("SELECT * FROM patients WHERE id = $1", patient_id)
 
     if not row:
-        raise HTTPException(status_code=404, detail="Patient introuvable")
+        raise HTTPException(
+            status_code=404, 
+            detail="Patient introuvable"
+            )
+    if row["created_by"] != payload["user_id"]:
+        raise HTTPException(
+            status_code=403, 
+            detail="Accès refusé au patient demandé/Access denied — this patient does not belong to you"
+            )    
 
     return PatientResponse(
         id=row["id"],
