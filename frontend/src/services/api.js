@@ -16,7 +16,7 @@ export const loginUser = async (username, password) => {
     const body = new URLSearchParams();
     body.append('username', username);
     body.append('password', password);
-    const response = await fetch(`${API_URL}/auth/login`, {
+    const response = await fetch(`${API_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: body.toString()

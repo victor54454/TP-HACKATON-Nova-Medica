@@ -68,9 +68,9 @@ check "Login mauvais mot de passe" "401" "$CODE"
 
 # ── B6 : Login valide → token obtenu ─────────────────────
 echo ""
-echo -e "${BLUE}[B6]${NC} POST /api/auth/login avec identifiants valides..."
+echo -e "${BLUE}[B6]${NC} POST /api/auth/login avec identifiants valides (doctor)..."
 RESPONSE=$(curl -sk -X POST \
-  -F "username=admin" -F "password=admin" \
+  -F "username=doctor" -F "password=doctor123" \
   "$API_URL/api/auth/login")
 TOKEN=$(echo "$RESPONSE" | grep -o '"access_token":"[^"]*"' | cut -d'"' -f4)
 
@@ -78,12 +78,12 @@ if [ -n "$TOKEN" ]; then
   echo -e "${GREEN}[OK]${NC} Token JWT obtenu ✅"
   PASS=$((PASS + 1))
 
-  # B7 : Accès avec token valide
-  echo -e "${BLUE}[B7]${NC} GET /api/patients avec token valide..."
+  # B7 : Accès avec token valide (praticien)
+  echo -e "${BLUE}[B7]${NC} GET /api/patients avec token praticien valide..."
   CODE=$(curl -sk -o /dev/null -w "%{http_code}" \
     -H "Authorization: Bearer $TOKEN" \
     "$API_URL/api/patients")
-  check "GET /api/patients avec token valide" "200" "$CODE"
+  check "GET /api/patients avec token praticien valide" "200" "$CODE"
 else
   echo -e "${RED}[KO]${NC} Impossible d'obtenir un token JWT"
   FAIL=$((FAIL + 1))

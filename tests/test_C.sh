@@ -25,7 +25,7 @@ echo ""
 # ── Étape 1 : Créer un patient de test via l'API ──────────
 echo -e "${BLUE}[STEP 1]${NC} Obtention d'un token JWT..."
 TOKEN=$(curl -sk -X POST \
-  -F "username=admin" -F "password=admin" \
+  -F "username=admin" -F "password=admin123" \
   "$API_URL/api/auth/login" | grep -o '"access_token":"[^"]*"' | cut -d'"' -f4)
 
 if [ -z "$TOKEN" ]; then

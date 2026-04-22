@@ -25,7 +25,7 @@ echo ""
 
 # ── Étape 1 : Générer une connexion RÉUSSIE ───────────────
 echo -e "${BLUE}[STEP 1]${NC} Connexion réussie (admin / admin)..."
-curl -sk -X POST -F "username=admin" -F "password=victor1234" \
+curl -sk -X POST -F "username=admin" -F "password=admin123" \
   "$API_URL/api/auth/login" > /dev/null
 echo -e "${GREEN}[OK]${NC} Requête envoyée."
 echo ""

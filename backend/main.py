@@ -1,7 +1,7 @@
 # backend/main.py
 import os
 from contextlib import asynccontextmanager
-from datetime import date
+from datetime import date, datetime
 
 from fastapi import FastAPI, Depends, HTTPException, Request, status, Body
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,8 +15,9 @@ from passlib.context import CryptContext
 from config import settings
 from security import create_access_token, verify_token, verify_reception_or_praticien
 from schemas import (
-    PatientCreate, PatientResponse, TokenResponse, PatientUpdate, 
-    ConsultationCreate, ConsultationResponse, LoginRequest, PasswordChangeRequest
+    PatientCreate, PatientResponse, TokenResponse, PatientUpdate,
+    ConsultationCreate, ConsultationResponse, LoginRequest, PasswordChangeRequest,
+    RegisterRequest
 )
 from crypto import encrypt, decrypt
 from logger import setup_logger, log_info, log_warn, log_error
@@ -104,7 +105,7 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
     async with db_pool.acquire() as conn:
         user = await conn.fetchrow(
             "SELECT id, username, password, role, must_change_password FROM users WHERE username = $1",
-            login_data.username,
+            form_data.username,
         )
 
     if not user or not pwd_context.verify(form_data.password, user["password"]):
@@ -318,9 +319,10 @@ async def list_consultations(patient_id: int, payload: dict = Depends(verify_rec
     return [
         ConsultationResponse(
             id=r["id"],
-            date=r["consultation_date"].date(),
+            consultation_date=r["consultation_date"],
             anamnesis=r["anamnesis"] if is_praticien else None,
             diagnosis=r["diagnosis"] if is_praticien else "Accès réservé au praticien",
+            medical_acts=r["medical_acts"] if is_praticien else None,
             prescription=r["prescription"] if is_praticien else None,
             doctor=r["doctor_name"],
             patient_id=r["patient_id"]
@@ -336,23 +338,27 @@ async def create_consultation(patient_id: int, consultation: ConsultationCreate,
     async with db_pool.acquire() as conn:
         row = await conn.fetchrow(
             """
-            INSERT INTO consultations (patient_id, doctor_id, anamnesis, diagnosis, prescription, consultation_date)
-            VALUES ($1, $2, $3, $4, $5, $6)
+            INSERT INTO consultations (patient_id, doctor_id, anamnesis, diagnosis, medical_acts, prescription, consultation_date)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *
             """,
             patient_id,
             payload["user_id"],
             consultation.anamnesis,
             consultation.diagnosis,
+            consultation.medical_acts,
             consultation.prescription,
-            consultation.date or date.today()
+            consultation.consultation_date or datetime.now()
         )
-        
+
     return ConsultationResponse(
         id=row["id"],
-        date=row["consultation_date"].date(),
+        consultation_date=row["consultation_date"],
+        anamnesis=row["anamnesis"],
         diagnosis=row["diagnosis"],
-        doctor=payload["sub"], 
+        medical_acts=row["medical_acts"],
+        prescription=row["prescription"],
+        doctor=payload["sub"],
         patient_id=row["patient_id"]
     )
 
