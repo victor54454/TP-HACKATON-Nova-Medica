@@ -59,7 +59,7 @@ services:
       dockerfile: Dockerfile
       args:
         # URL du backend telle que vue par le navigateur (localhost = hôte Docker)
-        NEXT_PUBLIC_API_URL: http://localhost:8000/api
+        NEXT_PUBLIC_API_URL: https://localhost/api
     container_name: hsecure-frontend-app
     restart: unless-stopped
     networks:
@@ -81,7 +81,7 @@ services:
     container_name: hsecure-backend
     restart: unless-stopped
     ports:
-      - "8000:8000"         # exposé pour Postman / démo jury
+      - "127.0.0.1:8000:8000"   # localhost uniquement — Postman/démo jury
     environment:
       - DATABASE_URL=postgresql://hsecure_user:${DB_PASSWORD}@database:5432/hsecure_db
       - JWT_SECRET=${JWT_SECRET}
@@ -107,7 +107,7 @@ services:
     container_name: hsecure-dozzle
     restart: unless-stopped
     ports:
-      - "8888:8080"
+      - "127.0.0.1:8888:8080"   # localhost uniquement — non exposé réseau
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro   # lecture seule
     environment:
@@ -119,22 +119,7 @@ services:
       - monitoring-net
 
   # ----------------------------------------------------------
-  # 5. REDIS — Cache (réseau interne backend uniquement)
-  # ----------------------------------------------------------
-  redis:
-    image: redis:7-alpine
-    container_name: hsecure-redis
-    restart: unless-stopped
-    command: redis-server --save "" --appendonly no --maxmemory 128mb --maxmemory-policy allkeys-lru
-    networks:
-      - backend-net
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-
-  # ----------------------------------------------------------
-  # 6. DATABASE — PostgreSQL (réseau interne uniquement)
+  # 5. DATABASE — PostgreSQL (réseau interne uniquement)
   # ----------------------------------------------------------
   database:
     image: postgres:15-alpine
@@ -142,15 +127,17 @@ services:
     restart: unless-stopped
     environment:
       - POSTGRES_DB=hsecure_db
-      - POSTGRES_USER=hsecure_user
-      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - DB_PASSWORD=${DB_PASSWORD}
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./database/00_setup.sh:/docker-entrypoint-initdb.d/00_setup.sh
+      - ./database/init.sql:/docker-entrypoint-initdb.d/01_init.sql
     networks:
       - backend-net           # uniquement backend-net — invisible depuis frontend (Test A ✅)
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U hsecure_user -d hsecure_db"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d hsecure_db"]
       interval: 10s
       timeout: 5s
       retries: 5

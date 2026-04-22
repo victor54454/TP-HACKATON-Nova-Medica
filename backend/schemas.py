@@ -1,7 +1,7 @@
 import re
 from datetime import date
 from typing import Optional
-from pydantic import BaseModel, field_validator, Field
+from pydantic import BaseModel, field_validator, Field, EmailStr
 
 
 # Regex : lettres, espaces, tirets, apostrophes uniquement → bloque les injections
@@ -42,7 +42,7 @@ class PatientCreate(BaseModel):
     last_name:              str           = Field(..., min_length=1, max_length=100)
     birth_date:             Optional[date]= None
     phone_number:           Optional[str] = Field(None, max_length=20)
-    email_address:          Optional[str] = Field(None, max_length=254)
+    email_address:          Optional[EmailStr] = None
     mail_address:           Optional[str] = Field(None, max_length=500)
     social_security_number: Optional[str] = Field(None, max_length=50)
     pathology:              Optional[str] = Field(None, max_length=500)

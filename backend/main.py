@@ -4,6 +4,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 import asyncpg
 from passlib.context import CryptContext
 
@@ -12,6 +15,8 @@ from security import create_access_token, verify_token
 from schemas import PatientCreate, PatientResponse, TokenResponse, RegisterRequest
 from crypto import encrypt, decrypt
 from logger import setup_logger, log_info, log_warn, log_error
+
+limiter = Limiter(key_func=get_remote_address)
 
 # ── Init logger ────────────────────────────────────────────────
 os.makedirs("/app/logs", exist_ok=True)
@@ -40,17 +45,19 @@ app = FastAPI(
     title="H-Secure API — Nova-Médica",
     version="1.0.0",
     lifespan=lifespan,
-    # Désactiver les docs en prod (activer pour la démo J3 !)
     docs_url="/docs",
     redoc_url=None,
 )
 
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["https://localhost"],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 
@@ -59,15 +66,28 @@ def get_client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
+async def write_access_log(user_id, action: str, ip: str, log_status: str, detail: str = None):
+    try:
+        async with db_pool.acquire() as conn:
+            await conn.execute(
+                "INSERT INTO access_logs (user_id, action, ip_address, status, detail) VALUES ($1, $2, $3, $4, $5)",
+                user_id, action, ip, log_status, detail,
+            )
+    except Exception:
+        pass
+
+
 # ══════════════════════════════════════════════════════════════
 #  AUTH
 # ══════════════════════════════════════════════════════════════
 
 @app.post("/api/auth/login", response_model=TokenResponse, tags=["Auth"])
+@limiter.limit("10/minute")
 async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends()):
     """
     Authentification — retourne un JWT valide 30 min.
     Log [INFO] si succès, [WARN] si échec (Test D ✅)
+    Limité à 10 tentatives/minute par IP.
     """
     ip = get_client_ip(request)
 
@@ -77,9 +97,12 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
             form_data.username,
         )
 
-    # Utilisateur inexistant ou mauvais mot de passe
     if not user or not pwd_context.verify(form_data.password, user["password"]):
         log_warn("AUTH", f"Failed login attempt from IP {ip} — user: {form_data.username}")
+        await write_access_log(
+            user["id"] if user else None, "LOGIN", ip, "FAILURE",
+            f"Bad credentials for username: {form_data.username}"
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Identifiants incorrects",
@@ -88,6 +111,7 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
 
     token = create_access_token({"sub": user["username"], "user_id": user["id"]})
     log_info("AUTH", f"Access granted for user {user['username']} from IP {ip}")
+    await write_access_log(user["id"], "LOGIN", ip, "SUCCESS", f"User {user['username']} authenticated")
     return {"access_token": token, "token_type": "bearer"}
 
 
@@ -187,6 +211,7 @@ async def create_patient(patient: PatientCreate, payload: dict = Depends(verify_
             payload["user_id"],
         )
 
+    await write_access_log(payload["user_id"], "CREATE_PATIENT", "internal", "SUCCESS", f"Patient id={row['id']}")
     return PatientResponse(
         id=row["id"],
         first_name=patient.first_name,
@@ -214,7 +239,8 @@ async def health():
 # ══════════════════════════════════════════════════════════════
 
 @app.post("/api/auth/register", status_code=201, tags=["Auth"])
-async def register(request: Request,user:RegisterRequest):
+@limiter.limit("5/minute")
+async def register(request: Request, user: RegisterRequest):
     """ Crée un nouveau compte praticien ou admin.
     Create a new doctor or admin account.
     Vérifie que le username n'existe pas déjà.
@@ -242,14 +268,15 @@ async def register(request: Request,user:RegisterRequest):
         hashed_password = pwd_context.hash(user.password)
 
         # Save new user / Sauvegarder le nouvel utilisateur
-        await conn.execute(
-            "INSERT INTO users (username, password, role) VALUES ($1, $2, $3)",
+        new_row = await conn.fetchrow(
+            "INSERT INTO users (username, password, role) VALUES ($1, $2, $3) RETURNING id",
             user.username,
             hashed_password,
             user.role
         )
 
     log_info("REGISTER", f"New user created: {user.username} role: {user.role} from IP {ip}")
+    await write_access_log(new_row["id"], "REGISTER", ip, "SUCCESS", f"New user: {user.username}")
     return {"message": f"Utilisateur {user.username} créé avec succès / User {user.username} created successfully"}
 
 # ══════════════════════════════════════════════════════════════
@@ -358,4 +385,5 @@ async def delete_patient(patient_id: int, payload: dict = Depends(verify_token))
         )
         
     log_info("PATIENTS", f"Patient {patient_id} deleted by user: {payload['sub']}")
+    await write_access_log(payload["user_id"], "DELETE_PATIENT", "internal", "SUCCESS", f"Patient id={patient_id}")
     return {"message": f"Patient supprimé avec succès / Patient deleted successfully"}

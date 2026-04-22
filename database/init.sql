@@ -58,3 +58,16 @@ ON CONFLICT (username) DO NOTHING;
 INSERT INTO users (username, password, role)
 VALUES ('victor', '$argon2id$v=19$m=65536,t=3,p=4$33vPGSOk1FrLWcv5H6P0vg$In7r06WI85Kb3EHkM/L+n+ZtP6FP/F/h6m883EVacVQ', 'victor')
 ON CONFLICT (username) DO NOTHING;
+
+-- ================================================================
+--  Principe du moindre privilège — droits restreints pour hsecure_user
+--  (l'utilisateur applicatif ne peut PAS supprimer des utilisateurs
+--   ni accéder aux séquences internes hors nécessité)
+-- ================================================================
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE patients       TO hsecure_user;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE consultations  TO hsecure_user;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE access_logs    TO hsecure_user;
+GRANT SELECT, INSERT, UPDATE          ON TABLE users         TO hsecure_user;
+REVOKE DELETE                          ON TABLE users         FROM hsecure_user;
+
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO hsecure_user;
