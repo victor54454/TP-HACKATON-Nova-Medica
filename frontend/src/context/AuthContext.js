@@ -16,7 +16,7 @@ export const AuthProvider = ({ children }) => {
         const token = localStorage.getItem('token');
         if (token) {
             try {
-                // Decodage du token JWT pour récupérer le nom et le rôle de l'utilisateur
+                // Decodage du token JWT 
                 const decoded = jwtDecode(token);
                 setUser({ username: decoded.sub || decoded.username, role: decoded.role });
             } catch (error) {

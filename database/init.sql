@@ -14,18 +14,18 @@ CREATE TABLE IF NOT EXISTS users (
 
 
 CREATE TABLE IF NOT EXISTS patients (
-    id                     SERIAL PRIMARY KEY,
-    first_name             TEXT NOT NULL,
-    last_name              TEXT NOT NULL,
-    social_security_number TEXT,
-    birth_date             DATE,
-    email_address          TEXT,
-    phone_number           TEXT,
-    mail_address           TEXT,
-    pathology              TEXT,
-    created_by             INTEGER REFERENCES users(id),
-    created_at             TIMESTAMP NOT NULL DEFAULT NOW(),
-    updated_at             TIMESTAMP NOT NULL DEFAULT NOW()
+    id          SERIAL PRIMARY KEY,  
+    first_name  TEXT NOT NULL,           
+    last_name   TEXT NOT NULL,           
+    social_security_number TEXT NOT NULL,         
+    birth_date  DATE,
+    email       TEXT,
+    phone       TEXT,
+    address     TEXT,
+    pathology   TEXT,                  
+    created_by  INTEGER REFERENCES users(id),
+    created_at  TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
 
@@ -52,5 +52,5 @@ CREATE TABLE IF NOT EXISTS access_logs (
 );
 
 INSERT INTO users (username, password, role)
-VALUES ('admin', '$argon2id$v=19$m=65536,t=3,p=4$hhAi5Lz3nrM2prQWQiiFEA$qU8GMH4JzhyLHq3+6pa87D1zVSx6qkIFcq8ueyZk2zg', 'admin')
+VALUES ('admin', '$argon2id$v=19$m=65536,t=3,p=4$YmU4OWI5MThkNDEyZGYyNA$w9hW3tKq6U/7n/F0/m9jZg', 'admin')
 ON CONFLICT (username) DO NOTHING;
