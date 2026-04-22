@@ -15,7 +15,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# 
 RUN adduser -D -u 1000 orktk && chown -R orktk:orktk /app
 USER orktk
 
