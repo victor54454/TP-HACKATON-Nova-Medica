@@ -10,20 +10,15 @@ from logger import log_warn
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
-
+# JWT
 def create_access_token(data: dict) -> str:
-    """Génère un JWT signé HS256 avec expiration"""
     payload = data.copy()
     expire = datetime.now(timezone.utc) + timedelta(minutes=settings.jwt_expire_minutes)
     payload.update({"exp": expire})
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
-
+#Middleware JWT
 def verify_token(token: str = Depends(oauth2_scheme)) -> dict:
-    """
-    Middleware JWT — actif sur toutes les routes sensibles (Test B ✅)
-    Retourne 401 si le token est absent, expiré ou invalide.
-    """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Token invalide ou expiré",
@@ -44,3 +39,18 @@ def verify_token(token: str = Depends(oauth2_scheme)) -> dict:
     except JWTError as e:
         log_warn("JWT", f"Token rejeté : {str(e)}")
         raise credentials_exception
+
+#Middleware Admin
+def verify_admin(payload: dict = Depends(verify_token)) -> dict:
+    if payload.get("role") != "admin":
+        from logger import log_warn
+        log_warn("AUTH_RBAC", f"Accès Admin refusé pour l'utilisateur {payload.get('sub')}")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Privilèges administrateur requis")
+    return payload
+
+#Middleware Reception ou Praticien
+def verify_reception_or_praticien(payload: dict = Depends(verify_token)) -> dict:
+    role = payload.get("role")
+    if role not in ["accueil", "praticien"]:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Accès refusé")
+    return payload

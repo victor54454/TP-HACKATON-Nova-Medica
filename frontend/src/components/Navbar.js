@@ -32,7 +32,7 @@ export default function Navbar() {
                         </div>
                     </div>
 
-                    {/* Lien Administration */}
+                    {/* Lien Admin */}
                     {user.role === 'admin' && (
                         <Link href="/admin" className="text-sm font-semibold hover:text-blue-400 transition border-b-2 border-transparent hover:border-blue-500 pb-0.5">Administration</Link>
                     )}

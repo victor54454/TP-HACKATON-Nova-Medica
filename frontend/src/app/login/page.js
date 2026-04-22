@@ -2,22 +2,21 @@
 import { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { ShieldAlert } from 'lucide-react';
+import { loginUser } from '@/services/api';
 
 /**
  * Page de connexion de l'application.
  * Gère l'authentification des praticiens.
  */
 export default function LoginPage() {
-   
+
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    const { login } = useAuth(); //fonction de login
+    const { login } = useAuth();
 
-    /**
-     * Gère la soumission du formulaire de connexion.
-     */
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setIsLoading(true);
@@ -25,14 +24,14 @@ export default function LoginPage() {
 
         try {
             // Mock
-         
-            login("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkci5ndXlvbiIsInVzZXJuYW1lIjoiZHIuZ3V5b24iLCJyb2xlIjoiYWRtaW4ifQ.faketoken");
+
+            // login("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkci5ndXlvbiIsInVzZXJuYW1lIjoiZHIuZ3V5b24iLCJyb2xlIjoiYWRtaW4ifQ.faketoken");
 
             // Appel API 
-            /*
+
             const data = await loginUser(username, password);
             login(data.access_token);
-            */
+
 
         } catch (err) {
             setError('Échec de l\'authentification. Vérifiez vos accès.');
@@ -52,8 +51,8 @@ export default function LoginPage() {
                         <div className="bg-blue-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner border border-blue-100">
                             <ShieldAlert className="w-10 h-10 text-blue-600" />
                         </div>
-                        <h1 className="text-3xl font-black text-slate-900 tracking-tight">Connexion Sécurisée</h1>
-                        <p className="text-slate-500 font-medium mt-2">Portail Professionnel Nova Médica</p>
+                        <h1 className="text-3xl font-black text-slate-900 tracking-tight">Connexion sécurisée</h1>
+                        <p className="text-slate-500 font-medium mt-2">Portail professionnel Nova Médica</p>
                     </div>
 
                     {/* Erreurs de connexion */}
@@ -66,7 +65,7 @@ export default function LoginPage() {
 
                     <div className="space-y-6">
                         <div>
-                            <label className="block text-sm font-bold text-slate-700 mb-1.5">Identifiant Praticien</label>
+                            <label className="block text-sm font-bold text-slate-700 mb-1.5">Identifiant utilisateur</label>
                             <input
                                 type="text"
                                 placeholder="ex: James Smith"

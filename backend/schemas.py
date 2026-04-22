@@ -1,15 +1,16 @@
+# backend/schemas.py
 import re
 from datetime import date, datetime
 from typing import Optional
-from pydantic import BaseModel, field_validator, Field
+from pydantic import BaseModel, field_validator, Field, EmailStr
 
 
-# Regex : lettres, espaces, tirets, apostrophes uniquement → bloque les injections
+# bloque les caractères spéciaux
 _SAFE_NAME = re.compile(r"^[a-zA-ZÀ-ÿ\s\-\']{1,100}$")
+_SSN_REGEX = re.compile(r"^\d{15}$")
 
 
 def _validate_name(v: str) -> str:
-    """Valide qu'un nom ne contient pas de caractères injectables"""
     if not _SAFE_NAME.match(v):
         raise ValueError(
             "Caractères non autorisés (SQL injection / XSS bloqué)"
@@ -37,57 +38,108 @@ class RegisterRequest(BaseModel):
 
 # --- Patients ---
 
-class PatientCreate(BaseModel):
-    first_name:             str           = Field(..., min_length=1, max_length=100)
-    last_name:              str           = Field(..., min_length=1, max_length=100)
-    birth_date:             Optional[date]= None
-    phone_number:           Optional[str] = Field(None, max_length=20)
-    email_address:          Optional[str] = Field(None, max_length=254)
-    mail_address:           Optional[str] = Field(None, max_length=500)
-    social_security_number: Optional[str] = Field(None, max_length=50)
-    pathology:              Optional[str] = Field(None, max_length=500)
+class PatientReceptionCreate(BaseModel):
+    first_name: str = Field(..., min_length=1, max_length=100)
+    last_name:  str = Field(..., min_length=1, max_length=100)
+    birth_date: date
+    social_security_number: str
+    address: Optional[str] = Field(None, max_length=500)
+    phone: Optional[str] = Field(None, max_length=20)
+    email: Optional[EmailStr] = Field(None, max_length=254)
 
     @field_validator("first_name", "last_name")
     @classmethod
     def validate_names(cls, v):
         return _validate_name(v)
 
+    @field_validator("social_security_number")
+    @classmethod
+    def validate_ssn(cls, v):
+        if not _SSN_REGEX.match(v):
+            raise ValueError("Le numéro de sécurité sociale doit contenir exactement 15 chiffres")
+        return v
+
+class PatientPraticienCreate(PatientReceptionCreate):
+    pathology: Optional[str] = Field(None, max_length=500)
+
+class PatientCreate(PatientPraticienCreate):
+    pass
+
+class PatientUpdate(BaseModel):
+    first_name: Optional[str] = Field(None, min_length=1, max_length=100)
+    last_name:  Optional[str] = Field(None, min_length=1, max_length=100)
+    birth_date: Optional[date] = None
+    social_security_number: Optional[str] = None
+    address: Optional[str] = Field(None, max_length=500)
+    phone: Optional[str] = Field(None, max_length=20)
+    email: Optional[EmailStr] = Field(None, max_length=254)
+    pathology: Optional[str] = Field(None, max_length=500)
+
+    @field_validator("first_name", "last_name")
+    @classmethod
+    def validate_names(cls, v):
+        if v is not None:
+            return _validate_name(v)
+        return v
+
+    @field_validator("social_security_number")
+    @classmethod
+    def validate_ssn(cls, v):
+        if v is not None and not _SSN_REGEX.match(v):
+            raise ValueError("Le numéro de sécurité sociale doit contenir exactement 15 chiffres")
+        return v
 
 class PatientResponse(BaseModel):
     id:         int
     first_name: str
     last_name:  str
-    pathology:  Optional[str]
-    birth_date: Optional[date]
+    birth_date: date
+    social_security_number: Optional[str] = None
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    pathology: Optional[str] = None
 
     class Config:
         from_attributes = True
-        
-        
-# --- Consultations ---
 
+
+# --- Admin ---
+
+class UserCreate(BaseModel):
+    username: str = Field(..., min_length=3, max_length=100)
+    password: str = Field(..., min_length=8)
+    role: str
+
+class UserUpdate(BaseModel):
+    username: Optional[str] = Field(None, min_length=3, max_length=100)
+    password: Optional[str] = Field(None, min_length=8)
+    role: Optional[str] = None
+
+class UserResponse(BaseModel):
+    id: int
+    username: str
+    role: str
+
+
+#Consultation
 class ConsultationCreate(BaseModel):
-    """
-    Schéma pour créer une consultation / Schema for creating a consultation
-    """
-    anamnesis:    str = Field(..., min_length=1, max_length=2000)
-    diagnosis:    str = Field(..., min_length=1, max_length=2000)
-    medical_acts: Optional[str] = Field(None, max_length=2000)
-    prescription: Optional[str] = Field(None, max_length=2000)
+    date: Optional[date] = None
+    anamnesis: Optional[str] = None
+    diagnosis: str
+    prescription: Optional[str] = None
+    doctor: Optional[str] = None
 
 
 class ConsultationResponse(BaseModel):
-    """
-    Schéma pour la réponse consultation / Schema for consultation response
-    """
-    id:                int
-    patient_id:        int
-    praticien_id:      int
-    anamnesis:         str
-    diagnosis:         str
-    medical_acts:      Optional[str]
-    prescription:      Optional[str]
-    consultation_date: datetime
+    id: int
+    date: date
+    anamnesis: Optional[str] = None
+    diagnosis: str
+    prescription: Optional[str] = None
+    doctor: str
+    patient_id: int
+
 
     class Config:
         from_attributes = True
