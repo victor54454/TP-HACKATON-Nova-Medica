@@ -1,13 +1,18 @@
 # =============================================================
 #  H-SECURE — Architecture Zero-Trust (Hackathon KEYCE 26)
 #  Client : Nova-Médica
-#  Stack  : React/Vite + FastAPI + PostgreSQL
+#  Stack  : Next.js + nginx + FastAPI + PostgreSQL
 # =============================================================
 #
 #  Réseaux :
-#    frontend-net  → Frontend <-> Backend  (HTTP)
-#    backend-net   → Backend  <-> Database (privé, jamais exposé)
+#    frontend-net  → nginx <-> frontend-app <-> backend  (HTTP)
+#    backend-net   → backend <-> database   (privé, jamais exposé)
+#    monitoring-net → dozzle uniquement (isolé)
 #
+#  Hardening appliqué sur chaque service :
+#    - no-new-privileges : empêche l'escalade de privilèges
+#    - cap_drop ALL      : suppression de toutes les capabilities Linux
+#    - utilisateur non-root dans chaque image applicative
 # =============================================================
 
 networks:
@@ -15,7 +20,10 @@ networks:
     driver: bridge
   backend-net:
     driver: bridge
-    internal: true
+    internal: true 
+  monitoring-net:
+    driver: bridge
+    #internal: true 
 
 volumes:
   postgres-data:
@@ -23,25 +31,60 @@ volumes:
 services:
 
   # ----------------------------------------------------------
-  # 1. FRONTEND — React / Vite
+  # 1. FRONTEND-NGINX — Reverse proxy (seul port public front)
   # ----------------------------------------------------------
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
+  frontend-nginx:
+    image: dhi.io/nginx:1.30-debian12
     container_name: hsecure-frontend
     restart: unless-stopped
     ports:
-      - "3000:3000"           # seul port public exposé côté front
-    environment:
-      - VITE_API_URL=http://backend:8000
+      - "443:8443"
+      - "80:8080"
+    volumes:
+      - ./frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./frontend/certs:/etc/nginx/certs:ro
+    networks:
+      - frontend-net
+    depends_on:
+      - frontend-app
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: "0.25"
+
+  # ----------------------------------------------------------
+  # 2. FRONTEND-APP — Next.js (réseau interne, non exposé)
+  # ----------------------------------------------------------
+  frontend-app:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # URL du backend telle que vue par le navigateur (localhost = hôte Docker)
+        NEXT_PUBLIC_API_URL: https://localhost/api
+    container_name: hsecure-frontend-app
+    restart: unless-stopped
     networks:
       - frontend-net
     depends_on:
       - backend
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.50"
 
   # ----------------------------------------------------------
-  # 2. BACKEND — FastAPI (Python)
+  # 3. BACKEND — FastAPI (Python)
   # ----------------------------------------------------------
   backend:
     build:
@@ -50,7 +93,7 @@ services:
     container_name: hsecure-backend
     restart: unless-stopped
     ports:
-      - "8000:8000"           # exposé uniquement pour Postman / démo
+      - "127.0.0.1:8000:8000"   # localhost uniquement — Postman/démo jury
     environment:
       - DATABASE_URL=postgresql://hsecure_user:${DB_PASSWORD}@database:5432/hsecure_db
       - JWT_SECRET=${JWT_SECRET}
@@ -58,14 +101,49 @@ services:
       - JWT_EXPIRE_MINUTES=30
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
     networks:
-      - frontend-net          # parle au frontend
-      - backend-net           # parle a la DB
+      - frontend-net
+      - backend-net
     depends_on:
       database:
         condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.50"
 
   # ----------------------------------------------------------
-  # 3. DATABASE — PostgreSQL (réseau interne uniquement)
+  # 4. DOZZLE — UI logs temps réel (port 8888)
+  # ----------------------------------------------------------
+  dozzle:
+    image: amir20/dozzle:latest
+    container_name: hsecure-dozzle
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8888:8080"   # localhost uniquement — non exposé réseau
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro   # lecture seule
+    environment:
+      - DOZZLE_FILTER=name=hsecure                     # affiche uniquement les containers H-Secure
+      - DOZZLE_LEVEL=info
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+          cpus: "0.10"
+    networks:
+      - monitoring-net
+
+  # ----------------------------------------------------------
+  # 5. DATABASE — PostgreSQL (réseau interne uniquement)
   # ----------------------------------------------------------
   database:
     image: postgres:15-alpine
@@ -73,15 +151,32 @@ services:
     restart: unless-stopped
     environment:
       - POSTGRES_DB=hsecure_db
-      - POSTGRES_USER=hsecure_user
-      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - DB_PASSWORD=${DB_PASSWORD}
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./database/00_setup.sh:/docker-entrypoint-initdb.d/00_setup.sh
+      - ./database/init.sql:/docker-entrypoint-initdb.d/01_init.sql
     networks:
-      - backend-net
+      - backend-net           # uniquement backend-net — invisible depuis frontend (Test A ✅)
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U hsecure_user -d hsecure_db"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d hsecure_db"]
       interval: 10s
       timeout: 5s
       retries: 5
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
+      - FOWNER
+      - DAC_OVERRIDE
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.50"

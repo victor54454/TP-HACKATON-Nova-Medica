@@ -9,11 +9,14 @@ python-jose[cryptography]==3.3.0
 passlib[argon2]==1.7.4
 python-multipart==0.0.9
 cryptography==42.0.7
+slowapi==0.1.9
 
 # Validation & config
 pydantic==2.7.1
 pydantic-settings==2.2.1
+pydantic[email]==2.7.1
 python-dotenv==1.0.1
+email-validator==2.1.1
 
 # Logging
 loguru==0.7.2

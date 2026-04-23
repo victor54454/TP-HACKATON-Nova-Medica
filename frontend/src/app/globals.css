@@ -1,0 +1,67 @@
+@import "tailwindcss";
+
+:root {
+  /* Premium Navy & Slate Palette */
+  --background: #f8fafc;
+  /* slate-50 */
+  --foreground: #0f172a;
+  /* slate-900 */
+  --card: #ffffff;
+  --card-foreground: #1e293b;
+  /* slate-800 */
+  --primary: #1d4ed8;
+  /* blue-700 */
+  --primary-foreground: #ffffff;
+  --secondary: #64748b;
+  /* slate-500 */
+  --muted-foreground: #94a3b8;
+  /* slate-400 */
+  --border: #e2e8f0;
+  /* slate-200 */
+  --radius: 0.75rem;
+
+  /* Tailwind 4 theme variables */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+
+h1,
+h2,
+h3,
+h4 {
+  color: var(--foreground);
+  letter-spacing: -0.025em;
+  font-weight: 700;
+}
+
+label {
+  font-weight: 600 !important;
+  color: #334155 !important;
+  /* slate-700 */
+  font-size: 0.875rem !important;
+  margin-bottom: 0.5rem !important;
+}
+
+input,
+textarea {
+  font-size: 1rem !important;
+  color: #1e293b !important;
+  /* slate-800 */
+  background-color: #ffffff !important;
+}
+
+::placeholder {
+  color: #94a3b8 !important;
+  /* slate-400 */
+}
