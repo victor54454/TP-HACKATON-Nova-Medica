@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
-# ============================================================
 #  TEST A — Étanchéité de la Base de Données (Infra)
 #  Objectif : Prouver que le frontend NE PEUT PAS atteindre
 #             la base de données (segmentation réseau Zero-Trust)
-# ============================================================
+
 set -euo pipefail
 
 FRONTEND_CONTAINER="hsecure-frontend-app"

@@ -1,5 +1,8 @@
 # backend/main.py
 import os
+import re
+import secrets
+import string
 from contextlib import asynccontextmanager
 from datetime import date, datetime
 
@@ -15,17 +18,57 @@ from passlib.context import CryptContext
 from config import settings
 from security import create_access_token, verify_token, verify_reception_or_praticien
 from schemas import (
-    PatientCreate, PatientResponse, TokenResponse, PatientUpdate,
+    PatientCreate, PatientResponse, PatientWithAccountResponse, TokenResponse, PatientUpdate,
     ConsultationCreate, ConsultationResponse, LoginRequest, PasswordChangeRequest,
-    RegisterRequest
+    RegisterRequest, ProfileUpdateRequest, UserResponse
 )
 from crypto import encrypt, decrypt
 from logger import setup_logger, log_info, log_warn, log_error
 import routers.admin as admin
 import routers.reception as reception
+import routers.patient as patient_router
 
 
 limiter = Limiter(key_func=get_remote_address)
+pwd_context_main = CryptContext(schemes=["argon2"], deprecated="auto")
+
+
+def _normalize_for_username(text: str) -> str:
+    replacements = {
+        'é':'e','è':'e','ê':'e','ë':'e','à':'a','â':'a','ä':'a',
+        'ù':'u','û':'u','ü':'u','ô':'o','ö':'o','î':'i','ï':'i',
+        'ç':'c','ñ':'n','œ':'oe','æ':'ae'
+    }
+    text = text.lower()
+    for char, replacement in replacements.items():
+        text = text.replace(char, replacement)
+    text = re.sub(r"[^a-z0-9]", ".", text)
+    return text.strip(".")
+
+
+def _generate_temp_password() -> str:
+    charset = string.ascii_letters + string.digits + "@$!%*?&"
+    while True:
+        pwd = "".join(secrets.choice(charset) for _ in range(14))
+        if (
+            any(c.isupper() for c in pwd)
+            and any(c.islower() for c in pwd)
+            and any(c.isdigit() for c in pwd)
+            and any(c in "@$!%*?&" for c in pwd)
+        ):
+            return pwd
+
+
+async def _get_unique_username(conn, base: str) -> str:
+    row = await conn.fetchrow("SELECT id FROM users WHERE username = $1", base)
+    if not row:
+        return base
+    for i in range(2, 200):
+        candidate = f"{base}{i}"
+        row = await conn.fetchrow("SELECT id FROM users WHERE username = $1", candidate)
+        if not row:
+            return candidate
+    return f"{base}.{secrets.token_hex(3)}"
 
 # ── Init logger ────────────────────────────────────────────────
 os.makedirs("/app/logs", exist_ok=True)
@@ -33,6 +76,7 @@ setup_logger()
 
 # Hashage des mots de passe
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
+
 
 
 # Pool de connexions DB
@@ -67,7 +111,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://localhost"],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
     allow_headers=["Authorization", "Content-Type"],
 )
 
@@ -132,24 +176,59 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
 
 @app.post("/api/auth/change-password", tags=["Auth"])
 async def change_password(
-    data: PasswordChangeRequest, 
+    data: PasswordChangeRequest,
     payload: dict = Depends(verify_token)
 ):
-    """
-    Changer le mot de passe/ change password
-    """
-    
     user_id = payload.get("user_id")
     hashed_pwd = pwd_context.hash(data.new_password)
-    
+
     async with db_pool.acquire() as conn:
         await conn.execute(
             "UPDATE users SET password = $1, must_change_password = FALSE WHERE id = $2",
             hashed_pwd, user_id
         )
-        
+
     log_info("AUTH", f"Password changed for user {payload['sub']}")
     return {"message": "Mot de passe mis à jour avec succès"}
+
+
+@app.get("/api/auth/profile", response_model=UserResponse, tags=["Auth"])
+async def get_profile(payload: dict = Depends(verify_token)):
+    user_id = payload["user_id"]
+    async with db_pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT id, username, role, first_name, last_name, phone, email FROM users WHERE id = $1",
+            user_id
+        )
+    if not row:
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable")
+    return UserResponse(**row)
+
+
+@app.patch("/api/auth/profile", response_model=UserResponse, tags=["Auth"])
+async def update_profile(data: ProfileUpdateRequest, payload: dict = Depends(verify_token)):
+    if payload.get("role") == "patient":
+        raise HTTPException(status_code=403, detail="Les patients ne peuvent pas modifier leur profil directement")
+
+    user_id = payload["user_id"]
+    update_data = data.model_dump(exclude_unset=True)
+    if not update_data:
+        raise HTTPException(status_code=400, detail="Aucune donnée à mettre à jour")
+
+    if "email" in update_data and update_data["email"]:
+        update_data["email"] = str(update_data["email"])
+
+    cols = ", ".join([f"{k} = ${i+2}" for i, k in enumerate(update_data.keys())])
+    vals = list(update_data.values())
+
+    async with db_pool.acquire() as conn:
+        row = await conn.fetchrow(
+            f"UPDATE users SET {cols} WHERE id = $1 RETURNING id, username, role, first_name, last_name, phone, email",
+            user_id, *vals
+        )
+
+    log_info("AUTH", f"Profile updated for user {payload['sub']}")
+    return UserResponse(**row)
 
 
 # PATIENTS 
@@ -207,43 +286,70 @@ async def get_patient(patient_id: int, payload: dict = Depends(verify_reception_
     )
 
 
-@app.post("/api/patients", response_model=PatientResponse, status_code=201, tags=["Patients"])
+@app.post("/api/patients", response_model=PatientWithAccountResponse, status_code=201, tags=["Patients"])
 async def create_patient(patient: PatientCreate, payload: dict = Depends(verify_reception_or_praticien)):
     if payload.get("role") == "accueil" and patient.pathology:
         raise HTTPException(status_code=403, detail="L'accueil ne peut pas enregistrer de données de santé")
-        
+
     log_info("PATIENTS", f"Create patient — user: {payload['sub']}")
 
-    async with db_pool.acquire() as conn:
-        row = await conn.fetchrow(
-            """
-            INSERT INTO patients (
-                first_name, last_name, social_security_number, birth_date, email, phone, address, pathology, created_by
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-            RETURNING *
-            """,
-            encrypt(patient.first_name),   
-            encrypt(patient.last_name),     
-            encrypt(patient.social_security_number),
-            patient.birth_date,
-            patient.email,
-            patient.phone,
-            patient.address,
-            encrypt(patient.pathology) if patient.pathology else None,
-            payload["user_id"],
-        )
+    base_username = (
+        _normalize_for_username(patient.first_name)
+        + "."
+        + _normalize_for_username(patient.last_name)
+    )
+    temp_password = _generate_temp_password()
 
-    await write_access_log(payload["user_id"], "CREATE_PATIENT", "internal", "SUCCESS", f"Patient id={row['id']}")
-    return PatientResponse(
+    async with db_pool.acquire() as conn:
+        async with conn.transaction():
+            row = await conn.fetchrow(
+                """
+                INSERT INTO patients (
+                    first_name, last_name, social_security_number, birth_date, email, phone, address, pathology, created_by
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                RETURNING *
+                """,
+                encrypt(patient.first_name),
+                encrypt(patient.last_name),
+                encrypt(patient.social_security_number),
+                patient.birth_date,
+                patient.email,
+                patient.phone,
+                patient.address,
+                encrypt(patient.pathology) if patient.pathology else None,
+                payload["user_id"],
+            )
+
+            username = await _get_unique_username(conn, base_username)
+            hashed_pwd = pwd_context.hash(temp_password)
+
+            user_row = await conn.fetchrow(
+                """
+                INSERT INTO users (username, password, role, first_name, last_name, email, phone, must_change_password)
+                VALUES ($1, $2, 'patient', $3, $4, $5, $6, TRUE)
+                RETURNING id
+                """,
+                username, hashed_pwd,
+                patient.first_name, patient.last_name,
+                patient.email, patient.phone,
+            )
+
+            await conn.execute(
+                "UPDATE patients SET user_account_id = $1 WHERE id = $2",
+                user_row["id"], row["id"]
+            )
+
+    await write_access_log(payload["user_id"], "CREATE_PATIENT", "internal", "SUCCESS", f"Patient id={row['id']} — compte: {username}")
+    return PatientWithAccountResponse(
         id=row["id"],
         first_name=patient.first_name,
         last_name=patient.last_name,
         birth_date=row["birth_date"],
-        social_security_number=patient.social_security_number,
         email=row["email"],
         phone=row["phone"],
         address=row["address"],
-        pathology=patient.pathology if payload.get("role") == "praticien" else None
+        patient_username=username,
+        temp_password=temp_password,
     )
 
 @app.patch("/api/patients/{patient_id}", response_model=PatientResponse, tags=["Patients"])
@@ -311,7 +417,7 @@ async def list_consultations(patient_id: int, payload: dict = Depends(verify_rec
     async with db_pool.acquire() as conn:
         rows = await conn.fetch(
             """
-            SELECT c.*, u.username as doctor_name 
+            SELECT c.*, u.first_name, u.last_name 
             FROM consultations c 
             JOIN users u ON c.doctor_id = u.id 
             WHERE c.patient_id = $1 
@@ -328,7 +434,7 @@ async def list_consultations(patient_id: int, payload: dict = Depends(verify_rec
             diagnosis=r["diagnosis"] if is_praticien else "Accès réservé au praticien",
             medical_acts=r["medical_acts"] if is_praticien else None,
             prescription=r["prescription"] if is_praticien else None,
-            doctor=r["doctor_name"],
+            doctor=f"{r['first_name']} {r['last_name']}".strip() if r['first_name'] else payload["sub"],
             patient_id=r["patient_id"]
         )
         for r in rows
@@ -354,6 +460,9 @@ async def create_consultation(patient_id: int, consultation: ConsultationCreate,
             consultation.prescription,
             consultation.consultation_date or datetime.now()
         )
+        
+        # Récupérer le nom complet du praticien pour la réponse
+        doctor_data = await conn.fetchrow("SELECT first_name, last_name FROM users WHERE id = $1", payload["user_id"])
 
     return ConsultationResponse(
         id=row["id"],
@@ -362,7 +471,7 @@ async def create_consultation(patient_id: int, consultation: ConsultationCreate,
         diagnosis=row["diagnosis"],
         medical_acts=row["medical_acts"],
         prescription=row["prescription"],
-        doctor=payload["sub"],
+        doctor=f"{doctor_data['first_name']} {doctor_data['last_name']}".strip() if doctor_data['first_name'] else payload["sub"],
         patient_id=row["patient_id"]
     )
 
@@ -409,8 +518,9 @@ async def get_logs(payload: dict = Depends(verify_token)):
         
 
 
-app.include_router(admin.router)    
+app.include_router(admin.router)
 app.include_router(reception.router)
+app.include_router(patient_router.router)
 # ══════════════════════════════════════════════════════════════
 #  REGISTER - Create a new user /Creer un nouvel utilisateur
 # ══════════════════════════════════════════════════════════════
@@ -456,111 +566,3 @@ async def register(request: Request, user: RegisterRequest):
     await write_access_log(new_row["id"], "REGISTER", ip, "SUCCESS", f"New user: {user.username}")
     return {"message": f"Utilisateur {user.username} créé avec succès / User {user.username} created successfully"}
 
-# ══════════════════════════════════════════════════════════════
-#  UPDATE PATIENT
-# ═══════════════════════════════════════════════════════════════
-
-@app.put("/api/patients/{patient_id}", response_model=PatientResponse, tags=["Patients"])
-async def update_patient(patient_id: int, patient: PatientCreate, payload: dict = Depends(verify_token)):
-    """
-    Modifie un patient existant — JWT requis.
-    Update an existing patient — JWT required.
-    Seul le praticien qui a créé ce patient peut le modifier (protection IDOR).
-    Only the doctor who created this patient can update it (IDOR protection).
-    """
-    log_info("PATIENTS", f"Update patient {patient_id} — user: {payload['sub']}")
-
-    async with db_pool.acquire() as conn:
-        
-        # Check if patient exists / Vérifier si le patient existe
-        existing = await conn.fetchrow(
-            "SELECT * FROM patients WHERE id = $1", patient_id
-        )
-
-        if not existing:
-            raise HTTPException(
-                status_code=404, 
-                detail="Patient introuvable / Patient not found"
-                )
-        # Protection IDOR : check ownership / IDOR protection: vérifier la propriété du patient
-        if existing["created_by"] != payload["user_id"]:
-            raise HTTPException(
-                status_code=403, 
-                detail="Accès refusé au patient demandé/Access denied — this patient does not belong to you"
-                )    
-            
-        # Update patient / Mettre à jour le patient
-        row = await conn.fetchrow(
-            """
-            UPDATE patients
-            SET first_name = $1, last_name = $2, birth_date = $3,
-                phone_number = $4, email_address = $5, mail_address = $6,
-                social_security_number = $7, pathology = $8,
-                updated_at = NOW()
-            WHERE id = $9
-            RETURNING *
-            """,
-            encrypt(patient.first_name),
-            encrypt(patient.last_name),
-            patient.birth_date,
-            encrypt(patient.phone_number)           if patient.phone_number           else None,
-            encrypt(patient.email_address)          if patient.email_address          else None,
-            encrypt(patient.mail_address)           if patient.mail_address           else None,
-            encrypt(patient.social_security_number) if patient.social_security_number else None,
-            encrypt(patient.pathology)              if patient.pathology              else None,
-            patient_id,
-        )
-    return PatientResponse(
-        id=row["id"],
-        first_name=patient.first_name,
-        last_name=patient.last_name,
-        birth_date=row["birth_date"],
-        phone_number=patient.phone_number,
-        email_address=patient.email_address,
-        mail_address=patient.mail_address,
-        social_security_number=patient.social_security_number,
-        pathology=patient.pathology,
-    )
-    
-# ══════════════════════════════════════════════════════════════
-#  DELETE PATIENT
-# ══════════════════════════════════════════════════════════════
-
-@app.delete("/api/patients/{patient_id}", tags=["Patients"])
-async def delete_patient(patient_id: int, payload: dict = Depends(verify_token)):
-    """
-    Supprime un patient existant — JWT requis.
-    Delete an existing patient — JWT required.
-    Seul le praticien qui a créé ce patient peut le supprimer (protection IDOR).
-    Only the doctor who created this patient can delete it (IDOR protection).
-    """
-    log_info("PATIENTS", f"Delete patient {patient_id} — user: {payload['sub']}")
-
-    async with db_pool.acquire() as conn:
-        
-        # Check if patient exists / Vérifier si le patient existe
-        existing = await conn.fetchrow(
-            "SELECT * FROM patients WHERE id = $1", patient_id
-        )
-
-        if not existing:
-            raise HTTPException(
-                status_code=404, 
-                detail="Patient introuvable / Patient not found"
-                )
-        # Protection IDOR : check ownership / IDOR protection: vérifier la propriété du patient
-        if existing["created_by"] != payload["user_id"]:
-            raise HTTPException(
-                status_code=403, 
-                detail="Accès refusé au patient demandé/Access denied — this patient does not belong to you"
-                )    
-            
-        # Delete patient / Supprimer le patient
-        await conn.execute(
-            "DELETE FROM patients WHERE id = $1",
-            patient_id
-        )
-        
-    log_info("PATIENTS", f"Patient {patient_id} deleted by user: {payload['sub']}")
-    await write_access_log(payload["user_id"], "DELETE_PATIENT", "internal", "SUCCESS", f"Patient id={patient_id}")
-    return {"message": f"Patient supprimé avec succès / Patient deleted successfully"}

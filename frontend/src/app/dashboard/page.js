@@ -19,6 +19,10 @@ export default function Dashboard() {
       router.replace('/admin');
       return;
     }
+    if (user?.role === 'patient') {
+      router.replace('/patient/dashboard');
+      return;
+    }
     getPatients()
       .then(data => setPatients(data))
       .catch(err => console.error("Erreur API Patients:", err));
@@ -76,7 +80,6 @@ export default function Dashboard() {
                   <td className="p-5">
                     <div className="flex flex-col">
                       <span className="text-slate-900 font-black">{patient.last_name.toUpperCase()} {patient.first_name}</span>
-                      <span className="text-slate-500 text-xs mt-0.5 italic">Dernière visite: {patient.last_consult}</span>
                     </div>
                   </td>
                   <td className="p-5">

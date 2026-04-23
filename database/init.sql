@@ -7,8 +7,12 @@
 CREATE TABLE IF NOT EXISTS users (
     id          SERIAL PRIMARY KEY,
     username    VARCHAR(100) NOT NULL UNIQUE,
-    password    TEXT NOT NULL,    -- Argon2/bcrypt hash stocké
+    password    TEXT NOT NULL,
     role        VARCHAR(50)  NOT NULL DEFAULT 'praticien',
+    first_name  VARCHAR(100),
+    last_name   VARCHAR(100),
+    phone       VARCHAR(20),
+    email       VARCHAR(200),
     must_change_password BOOLEAN NOT NULL DEFAULT TRUE,
     created_at  TIMESTAMP    NOT NULL DEFAULT NOW()
 );
@@ -23,7 +27,8 @@ CREATE TABLE IF NOT EXISTS patients (
     email       TEXT,
     phone       TEXT,
     address     TEXT,
-    pathology   TEXT,                  
+    pathology   TEXT,
+    user_account_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
     created_by  INTEGER REFERENCES users(id),
     created_at  TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at  TIMESTAMP NOT NULL DEFAULT NOW()
@@ -62,14 +67,13 @@ VALUES ('victor', '$argon2id$v=19$m=65536,t=3,p=4$7937f2+tNcbYO4cw5rzXGg$YTKo+wS
 ON CONFLICT (username) DO NOTHING;
 
 -- ================================================================
---  Principe du moindre privilÃ¨ge â€” droits restreints pour hsecure_user
---  (l'utilisateur applicatif ne peut PAS supprimer des utilisateurs
---   ni accÃ©der aux sÃ©quences internes hors nÃ©cessitÃ©)
+--  Droits applicatifs pour hsecure_user
+--  DELETE sur users autorisé uniquement pour la suppression des comptes patients
+--  (restriction appliquée au niveau applicatif : role='patient' uniquement)
 -- ================================================================
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE patients       TO hsecure_user;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE consultations  TO hsecure_user;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE access_logs    TO hsecure_user;
-GRANT SELECT, INSERT, UPDATE          ON TABLE users         TO hsecure_user;
-REVOKE DELETE                          ON TABLE users         FROM hsecure_user;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE users          TO hsecure_user;
 
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO hsecure_user;

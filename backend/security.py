@@ -54,3 +54,9 @@ def verify_reception_or_praticien(payload: dict = Depends(verify_token)) -> dict
     if role not in ["accueil", "praticien"]:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Accès refusé")
     return payload
+
+#Middleware Patient
+def verify_patient(payload: dict = Depends(verify_token)) -> dict:
+    if payload.get("role") != "patient":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Accès réservé aux patients")
+    return payload

@@ -109,9 +109,46 @@ export const createConsultation = async (patientId, consultationData) => {
 };
 
 
+// Patient (espace personnel)
+export const getMyPatientData = async () => {
+    const response = await fetch(`${API_URL}/api/patient/me`, { headers: getAuthHeaders() });
+    if (!response.ok) throw new Error('Erreur lors de la récupération de vos données');
+    return response.json();
+};
+
+export const getMyConsultations = async () => {
+    const response = await fetch(`${API_URL}/api/patient/me/consultations`, { headers: getAuthHeaders() });
+    if (!response.ok) throw new Error('Erreur lors de la récupération de vos consultations');
+    return response.json();
+};
+
+// Profil utilisateur
+export const getProfile = async () => {
+    const response = await fetch(`${API_URL}/api/auth/profile`, { headers: getAuthHeaders() });
+    if (!response.ok) throw new Error('Erreur lors de la récupération du profil');
+    return response.json();
+};
+
+export const updateProfile = async (profileData) => {
+    const response = await fetch(`${API_URL}/api/auth/profile`, {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(profileData),
+    });
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Erreur lors de la mise à jour du profil');
+    }
+    return response.json();
+};
+
 // Admin
-export async function getUsers() {
-    const response = await fetch(`${API_URL}/api/admin/users`, {
+export async function getUsers(search = '') {
+    const url = search
+        ? `${API_URL}/api/admin/users?search=${encodeURIComponent(search)}`
+        : `${API_URL}/api/admin/users`;
+
+    const response = await fetch(url, {
         headers: getAuthHeaders(),
     });
     if (!response.ok) throw new Error('Échec du chargement des utilisateurs');

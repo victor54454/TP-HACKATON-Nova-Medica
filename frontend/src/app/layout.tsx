@@ -23,7 +23,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
         <AuthProvider>
           <Navbar />
           {/* Contenu principal des pages */}
-          <main className="container mx-auto p-4 sm:p-8">
+          <main className="container mx-auto p-4 sm:p-8 animate-in">
             {children}
           </main>
         </AuthProvider>

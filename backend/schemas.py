@@ -53,7 +53,7 @@ class RegisterRequest(BaseModel):
     username: str = Field(..., min_length=1, max_length=100)
     password: str = Field(..., min_length=12, max_length=200)
     role: str = Field(..., pattern="^(praticien|admin)$")
-    
+
     @field_validator("password")
     @classmethod
     def validate_password(cls, v):
@@ -63,11 +63,18 @@ class RegisterRequest(BaseModel):
 class PasswordChangeRequest(BaseModel):
     """Schéma pour la demande de changement de mot de passe/Schema for password change request"""
     new_password: str = Field(..., min_length=12, max_length=200)
-    
+
     @field_validator("new_password")
     @classmethod
     def validate_new_password(cls, v):
         return _validate_password(v)
+
+
+class ProfileUpdateRequest(BaseModel):
+    first_name: Optional[str] = Field(None, max_length=100)
+    last_name: Optional[str] = Field(None, max_length=100)
+    phone: Optional[str] = Field(None, max_length=20)
+    email: Optional[EmailStr] = Field(None, max_length=200)
 
 
 # --- Patients ---
@@ -159,12 +166,29 @@ class PatientResponse(BaseModel):
         from_attributes = True
 
 
+class PatientWithAccountResponse(BaseModel):
+    id: int
+    first_name: str
+    last_name: str
+    birth_date: date
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    patient_username: str
+    temp_password: str
+
+
 # --- Admin ---
 
 class UserCreate(BaseModel):
     username: str = Field(..., min_length=3, max_length=100)
     password: str = Field(..., min_length=12)
     role: str
+    first_name: Optional[str] = Field(None, max_length=100)
+    last_name: Optional[str] = Field(None, max_length=100)
+    phone: Optional[str] = Field(None, max_length=20)
+    email: Optional[EmailStr] = Field(None, max_length=200)
+
     @field_validator("password")
     @classmethod
     def validate_password(cls, v):
@@ -174,6 +198,11 @@ class UserUpdate(BaseModel):
     username: Optional[str] = Field(None, min_length=3, max_length=100)
     password: Optional[str] = Field(None, min_length=12)
     role: Optional[str] = None
+    first_name: Optional[str] = Field(None, max_length=100)
+    last_name: Optional[str] = Field(None, max_length=100)
+    phone: Optional[str] = Field(None, max_length=20)
+    email: Optional[EmailStr] = Field(None, max_length=200)
+
     @field_validator("password")
     @classmethod
     def validate_password(cls, v):
@@ -185,6 +214,10 @@ class UserResponse(BaseModel):
     id: int
     username: str
     role: str
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
 
 
 #Consultation

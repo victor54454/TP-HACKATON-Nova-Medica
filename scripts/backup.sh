@@ -10,7 +10,7 @@ DB_USER="hsecure_user"
 DB_NAME="hsecure_db"
 GPG_RECIPIENT="backup_hsecure"
 
-# ── Vérifications ──────────────────────────────────────────────────────────────
+# Vérifications
 
 if ! docker ps --format '{{.Names}}' | grep -q "^${CONTAINER}$"; then
   echo "[ERREUR] Le container '${CONTAINER}' n'est pas en cours d'exécution." >&2
@@ -25,7 +25,7 @@ fi
 
 mkdir -p "$BACKUP_DIR"
 
-# ── Dump + chiffrement ─────────────────────────────────────────────────────────
+# Dump + chiffrement
 
 echo "[INFO] Dump de ${DB_NAME} en cours..."
 
@@ -38,6 +38,6 @@ docker exec "${CONTAINER}" \
 
 echo "[OK] Backup chiffré : ${BACKUP_FILE}"
 
-# ── Rotation : supprime les dumps de plus de 30 jours ─────────────────────────
+# Rotation : supprime les dumps de plus de 30 jours
 
 find "$BACKUP_DIR" -name "hsecure_db_*.sql.gpg" -mtime +30 -delete

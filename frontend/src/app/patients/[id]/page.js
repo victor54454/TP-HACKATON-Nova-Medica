@@ -40,7 +40,7 @@ export default function PatientProfile({ params }) {
     if (!patient) return <div className="p-10 text-center font-bold text-red-500">Patient introuvable.</div>;
 
     return (
-        <ProtectedRoute>
+        <ProtectedRoute allowedRoles={['accueil', 'praticien', 'admin']}>
             {/* Profile patient avec bouton pour nouvelle consultation*/}
             <div className="flex justify-between items-start mb-8">
                 <div>
@@ -99,7 +99,7 @@ export default function PatientProfile({ params }) {
                         {consultations.map(consult => (
                             <div key={consult.id} className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 border-l-4 border-l-red-500 space-y-3">
                                 <div className="flex justify-between text-sm text-slate-500">
-                                    <span>Date : {consult.date}</span>
+                                    <span>Date : {new Date(consult.consultation_date).toLocaleDateString('fr-FR')}</span>
                                     <span>Praticien : {consult.doctor}</span>
                                 </div>
                                 {consult.anamnesis && (

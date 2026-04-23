@@ -35,6 +35,8 @@ export const AuthProvider = ({ children }) => {
 
         if (mustChange) {
             router.push('/change-password');
+        } else if (decoded.role === 'patient') {
+            router.push('/patient/dashboard');
         } else {
             router.push('/dashboard');
         }

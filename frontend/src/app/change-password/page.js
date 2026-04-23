@@ -12,7 +12,7 @@ export default function ChangePasswordPage() {
     const [error, setError] = useState('');
     const [success, setSuccess] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
-    const { logout } = useAuth();
+    const { logout, user } = useAuth();
     const router = useRouter();
     const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{12,}$/;
 
@@ -37,8 +37,7 @@ export default function ChangePasswordPage() {
             await changePassword(newPassword);
             setSuccess(true);
             setTimeout(() => {
-                // Redirection vers le dashboard après succès
-                router.push('/dashboard');
+                router.push(user?.role === 'patient' ? '/patient/dashboard' : '/dashboard');
             }, 2000);
         } catch (err) {
             setError(err.message || 'Une erreur est survenue.');

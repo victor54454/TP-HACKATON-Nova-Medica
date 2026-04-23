@@ -1,8 +1,6 @@
-# =============================================================
 #  H-SECURE — Architecture Zero-Trust (Hackathon KEYCE 26)
 #  Client : Nova-Médica
 #  Stack  : Next.js + nginx + FastAPI + PostgreSQL
-# =============================================================
 #
 #  Réseaux :
 #    frontend-net  → nginx <-> frontend-app <-> backend  (HTTP)
@@ -13,7 +11,7 @@
 #    - no-new-privileges : empêche l'escalade de privilèges
 #    - cap_drop ALL      : suppression de toutes les capabilities Linux
 #    - utilisateur non-root dans chaque image applicative
-# =============================================================
+
 
 networks:
   frontend-net:
@@ -30,9 +28,7 @@ volumes:
 
 services:
 
-  # ----------------------------------------------------------
-  # 1. FRONTEND-NGINX — Reverse proxy (seul port public front)
-  # ----------------------------------------------------------
+  # FRONTEND-NGINX (reverse proxy)
   frontend-nginx:
     image: dhi.io/nginx:1.30-debian12
     container_name: hsecure-frontend
@@ -40,7 +36,7 @@ services:
     ports:
       - "443:8443"
       - "80:8080"
-      - "127.0.0.1:8000:8001"   # API directe Postman/jury — passée par nginx (anti-Slowloris)
+      - "127.0.0.1:8000:8001"  
     volumes:
       - ./frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - ./frontend/certs:/etc/nginx/certs:ro
@@ -58,9 +54,7 @@ services:
           memory: 128M
           cpus: "0.25"
 
-  # ----------------------------------------------------------
-  # 2. FRONTEND-APP — Next.js (réseau interne, non exposé)
-  # ----------------------------------------------------------
+  # FRONTEND-APP (réseau interne)
   frontend-app:
     build:
       context: ./frontend
@@ -84,16 +78,13 @@ services:
           memory: 512M
           cpus: "0.50"
 
-  # ----------------------------------------------------------
-  # 3. BACKEND — FastAPI (Python)
-  # ----------------------------------------------------------
+  # BACKEND
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: hsecure-backend
     restart: unless-stopped
-    # port 8000 supprimé — nginx proxie vers uvicorn (anti-Slowloris)
     environment:
       - DATABASE_URL=postgresql://hsecure_user:${DB_PASSWORD}@database:5432/hsecure_db
       - JWT_SECRET=${JWT_SECRET}
@@ -116,19 +107,19 @@ services:
           memory: 256M
           cpus: "0.50"
 
-  # ----------------------------------------------------------
-  # 4. DOZZLE — UI logs temps réel (port 8888)
-  # ----------------------------------------------------------
+  # DOZZLE — UI logs temps réel (port 8888)
   dozzle:
     image: amir20/dozzle:latest
     container_name: hsecure-dozzle
     restart: unless-stopped
     ports:
-      - "127.0.0.1:8888:8080"   # localhost uniquement — non exposé réseau
+      - "127.0.0.1:8888:8080"   
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro   # lecture seule
+    # lecture seule
+      - /var/run/docker.sock:/var/run/docker.sock:ro   
     environment:
-      - DOZZLE_FILTER=name=hsecure                     # affiche uniquement les containers H-Secure
+      # affiche uniquement les containers H-Secure
+      - DOZZLE_FILTER=name=hsecure                   
       - DOZZLE_LEVEL=info
     security_opt:
       - no-new-privileges:true
@@ -142,9 +133,8 @@ services:
     networks:
       - monitoring-net
 
-  # ----------------------------------------------------------
-  # 5. DATABASE — PostgreSQL (réseau interne uniquement)
-  # ----------------------------------------------------------
+
+  # DATABASE — PostgreSQL
   database:
     image: postgres:15-alpine
     container_name: hsecure-database
@@ -159,7 +149,8 @@ services:
       - ./database/00_setup.sh:/docker-entrypoint-initdb.d/00_setup.sh
       - ./database/init.sql:/docker-entrypoint-initdb.d/01_init.sql
     networks:
-      - backend-net           # uniquement backend-net — invisible depuis frontend (Test A ✅)
+    # uniquement backend-net invisible depuis frontend
+      - backend-net           
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d hsecure_db"]
       interval: 10s

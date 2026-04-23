@@ -1,5 +1,6 @@
 # Secrets — JAMAIS sur GitHub
 .env
+.txt
 
 # Python
 __pycache__/
