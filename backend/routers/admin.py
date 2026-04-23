@@ -16,6 +16,13 @@ async def create_user(
     # Vérification du rôle
     if user.role not in ["admin", "accueil", "praticien"]:
         raise HTTPException(status_code=400, detail="Rôle non reconnu")
+    
+    # Empêcher la création d'un autre admin / Prevent creating another admin
+    if user.role == "admin":
+        raise HTTPException(
+        status_code=403,
+        detail="Impossible de créer un autre administrateur / Cannot create another admin account"
+    )
 
     hashed_pwd = pwd_context.hash(user.password)
     pool = request.app.state.db_pool 
@@ -58,6 +65,7 @@ async def update_user(
         update_data = user_update.model_dump(exclude_unset=True)
         if "password" in update_data:
             update_data["password"] = pwd_context.hash(update_data["password"])
+            update_data["must_change_password"] = True 
             
         if not update_data:
             return UserResponse(**existing)

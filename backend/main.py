@@ -135,6 +135,10 @@ async def change_password(
     data: PasswordChangeRequest, 
     payload: dict = Depends(verify_token)
 ):
+    """
+    Changer le mot de passe/ change password
+    """
+    
     user_id = payload.get("user_id")
     hashed_pwd = pwd_context.hash(data.new_password)
     
@@ -366,6 +370,43 @@ async def create_consultation(patient_id: int, consultation: ConsultationCreate,
 @app.get("/api/health", tags=["Ops"])
 async def health():
     return {"status": "ok", "service": "H-Secure API"}
+
+#ADMIN LOGS
+
+@app.get("/api/admin/logs", tags=["Admin"])
+async def get_logs(payload: dict = Depends(verify_token)):
+    """
+    Retourne les logs d'accès — admin uniquement.
+    Returns access logs — admin only.
+    """
+    if payload.get("role") != "admin":
+        log_warn("ADMIN", f"Unauthorized logs access by: {payload['sub']}")
+        raise HTTPException(
+            status_code=403,
+            detail="Accès refusé — rôle admin requis / Access denied — admin role required"
+        )
+    log_info("ADMIN", f"Logs accessed by admin: {payload['sub']}")
+
+    try:
+        with open("/app/logs/hsecure.log", "r") as f:
+            lines = f.readlines()
+        
+        last_100 = lines[-100:] if len(lines) > 100 else lines
+        
+        parsed_logs = []
+        for i, line in enumerate(reversed(last_100)):
+            line = line.strip()
+            if line:
+                parsed_logs.append({
+                    "id": i + 1,
+                    "message": line,
+                    "date": line[:19] if len(line) > 19 else line
+                })
+        
+        return {"logs": parsed_logs}
+    except FileNotFoundError:
+        return {"logs": []}    
+        
 
 
 app.include_router(admin.router)    
