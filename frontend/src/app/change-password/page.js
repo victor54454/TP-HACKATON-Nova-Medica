@@ -14,15 +14,18 @@ export default function ChangePasswordPage() {
     const [isLoading, setIsLoading] = useState(false);
     const { logout } = useAuth();
     const router = useRouter();
+    const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{12,}$/;
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
 
-        if (newPassword.length < 8) {
-            setError('Le mot de passe doit contenir au moins 8 caractères.');
-            return;
-        }
+        if (!passwordRegex.test(newPassword)) {
+    setError(
+        "Le mot de passe doit contenir au moins 12 caractères, une majuscule, un chiffre et un caractère spécial."
+    );
+    return;
+}
 
         if (newPassword !== confirmPassword) {
             setError('Les mots de passe ne correspondent pas.');
@@ -77,7 +80,7 @@ export default function ChangePasswordPage() {
                                 <label className="block text-sm font-bold text-slate-700 mb-1.5">Nouveau mot de passe</label>
                                 <input
                                     type="password"
-                                    placeholder="Minimum 8 caractères"
+                                    placeholder="Minimum 12 caractères (0-9, A-Z, @§$!...)"
                                     className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:border-emerald-600 outline-none transition-all"
                                     value={newPassword}
                                     onChange={(e) => setNewPassword(e.target.value)}
