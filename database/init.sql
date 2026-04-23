@@ -29,6 +29,18 @@ CREATE TABLE IF NOT EXISTS patients (
     updated_at  TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS consultations (
+    id          SERIAL PRIMARY KEY,
+    patient_id  INTEGER REFERENCES patients(id) ON DELETE CASCADE,
+    doctor_id   INTEGER REFERENCES users(id),
+    consultation_date TIMESTAMP NOT NULL DEFAULT NOW(),
+    anamnesis    TEXT,  
+    diagnosis    TEXT,  
+    medical_acts TEXT,  
+    prescription TEXT,  
+    created_at  TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMP NOT NULL DEFAULT NOW()
+);  
 
 -- Table des logs d'accès (Test D ✅)
 CREATE TABLE IF NOT EXISTS access_logs (
