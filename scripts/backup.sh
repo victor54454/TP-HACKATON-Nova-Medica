@@ -32,6 +32,7 @@ echo "[INFO] Dump de ${DB_NAME} en cours..."
 docker exec "${CONTAINER}" \
   pg_dump -U "${DB_USER}" --format=custom "${DB_NAME}" \
   | gpg --batch --yes \
+        --trust-model always \
         --encrypt \
         --recipient "${GPG_RECIPIENT}" \
         --output "${BACKUP_FILE}"
