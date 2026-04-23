@@ -141,7 +141,6 @@ export default function AdminPage() {
               >
                 <option value="accueil">Accueil</option>
                 <option value="praticien">Praticien</option>
-                <option value="admin">Administrateur</option>
               </select>
             </div>
             <div className="flex items-end">
@@ -180,7 +179,7 @@ export default function AdminPage() {
               >
                 <option value="accueil">Accueil</option>
                 <option value="praticien">Praticien</option>
-                <option value="admin">Administrateur</option>
+                
               </select>
             </div>
             <div className="flex items-end gap-2 md:col-span-2">

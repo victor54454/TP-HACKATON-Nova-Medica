@@ -64,6 +64,9 @@ export default function Dashboard() {
               <tr className="bg-slate-50 border-b border-slate-200 font-bold text-slate-600">
                 <th className="p-5">Profil patient</th>
                 <th className="p-5 uppercase tracking-wider text-xs">N° Sécurité sociale</th>
+                <th className="p-5 uppercase tracking-wider text-xs">Email</th>
+                <th className="p-5 uppercase tracking-wider text-xs">Téléphone</th>
+                <th className="p-5 uppercase tracking-wider text-xs">Adresse</th>
                 <th className="p-5 text-right">Dossier</th>
               </tr>
             </thead>
