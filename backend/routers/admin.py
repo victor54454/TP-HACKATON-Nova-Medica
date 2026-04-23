@@ -63,6 +63,13 @@ async def update_user(
             raise HTTPException(status_code=404, detail="Utilisateur introuvable")
         
         update_data = user_update.model_dump(exclude_unset=True)
+        
+        # Prevent changing role to admin / Empêcher le changement de rôle vers admin
+        if update_data.get("role") == "admin":
+            raise HTTPException(
+        status_code=403,
+        detail="Impossible de promouvoir un utilisateur au rôle admin / Cannot promote user to admin role"
+    )
         if "password" in update_data:
             update_data["password"] = pwd_context.hash(update_data["password"])
             update_data["must_change_password"] = True 
