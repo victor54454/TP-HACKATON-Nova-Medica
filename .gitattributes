@@ -1,0 +1,5 @@
+# Force LF for shell and SQL files to prevent CRLF issues in Docker
+*.sh text eol=lf
+*.sql text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf

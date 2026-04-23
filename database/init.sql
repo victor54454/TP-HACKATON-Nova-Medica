@@ -1,6 +1,6 @@
 -- ================================================================
---  H-SECURE — Initialisation PostgreSQL (V2)
---  Clinique Nova-Médica
+--  H-SECURE â€” Initialisation PostgreSQL (V2)
+--  Clinique Nova-MÃ©dica
 -- ================================================================
 
 
@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS consultations (
     updated_at  TIMESTAMP NOT NULL DEFAULT NOW()
 );  
 
--- Table des logs d'accès (Test D ✅)
+-- Table des logs d'accÃ¨s (Test D âœ…)
 CREATE TABLE IF NOT EXISTS access_logs (
     id          SERIAL PRIMARY KEY,
     user_id     INTEGER REFERENCES users(id),
@@ -54,17 +54,17 @@ CREATE TABLE IF NOT EXISTS access_logs (
 );
 
 INSERT INTO users (username, password, role)
-VALUES ('admin', '$argon2id$v=19$m=65536,t=3,p=4$33vPGSOk1FrLWcv5H6P0vg$In7r06WI85Kb3EHkM/L+n+ZtP6FP/F/h6m883EVacVQ', 'admin')
+VALUES ('admin', '$argon2id$v=19$m=65536,t=3,p=4$+R9jDCHEmDPGmPMewzintA$Ys0SM9NrbxduKgnDz5jCIAoI2kimUU58h8byBBSaS3o', 'admin')
 ON CONFLICT (username) DO NOTHING;
 
 INSERT INTO users (username, password, role)
-VALUES ('victor', '$argon2id$v=19$m=65536,t=3,p=4$33vPGSOk1FrLWcv5H6P0vg$In7r06WI85Kb3EHkM/L+n+ZtP6FP/F/h6m883EVacVQ', 'victor')
+VALUES ('victor', '$argon2id$v=19$m=65536,t=3,p=4$7937f2+tNcbYO4cw5rzXGg$YTKo+wSbNsZSt0lNqKkjs+kcMZk6PIphm4ClxLbtdhs', 'praticien')
 ON CONFLICT (username) DO NOTHING;
 
 -- ================================================================
---  Principe du moindre privilège — droits restreints pour hsecure_user
+--  Principe du moindre privilÃ¨ge â€” droits restreints pour hsecure_user
 --  (l'utilisateur applicatif ne peut PAS supprimer des utilisateurs
---   ni accéder aux séquences internes hors nécessité)
+--   ni accÃ©der aux sÃ©quences internes hors nÃ©cessitÃ©)
 -- ================================================================
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE patients       TO hsecure_user;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE consultations  TO hsecure_user;
