@@ -44,7 +44,10 @@ export default function PatientDashboard() {
             </style></head><body>
             <h1>Ordonnance Médicale — Clinique Nova Médica</h1>
             <div class="info"><span class="label">Patient :</span> ${patient?.last_name?.toUpperCase()} ${patient?.first_name}</div>
-            <div class="info"><span class="label">Date de naissance :</span> ${patient?.birth_date}</div>
+            <div class="info"><span class="label">Né(e) le :</span> ${patient?.birth_date}</div>
+            <div class="info"><span class="label">N° Sécurité Sociale :</span> ${patient?.social_security_number || '—'}</div>
+            <div class="info"><span class="label">Adresse :</span> ${patient?.address || '—'}</div>
+            <div class="info"><span class="label">Téléphone :</span> ${patient?.phone || '—'}</div>
             <div class="info"><span class="label">Date de consultation :</span> ${new Date(consultation.consultation_date).toLocaleDateString('fr-FR')}</div>
             <div class="info"><span class="label">Médecin :</span> ${consultation.doctor}</div>
             ${consultation.prescription ? `<div class="info"><span class="label">Prescription :</span><div class="content">${consultation.prescription}</div></div>` : '<div class="info"><em>Aucune prescription</em></div>'}

@@ -3,7 +3,7 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { Activity, Stethoscope, Shield } from 'lucide-react';
+import { Activity, Stethoscope, Shield, Printer, FileText } from 'lucide-react';
 import { useState, useEffect, use } from 'react';
 import { getPatientById, getConsultations, deletePatient } from '@/services/api';
 
@@ -35,6 +35,32 @@ export default function PatientProfile({ params }) {
         };
         fetchData();
     }, [patientId, user]);
+
+    const handlePrint = (consultation) => {
+        const printWindow = window.open('', '_blank');
+        printWindow.document.write(`
+            <html><head><title>Ordonnance - ${new Date(consultation.consultation_date).toLocaleDateString('fr-FR')}</title>
+            <style>body{font-family:Arial,sans-serif;padding:40px;max-width:600px;margin:0 auto}
+            h1{font-size:20px;border-bottom:2px solid #333;padding-bottom:10px}
+            .info{margin:20px 0}.label{font-weight:bold;color:#555}
+            .content{background:#f9f9f9;padding:15px;border-radius:4px;white-space:pre-wrap}
+            .footer{margin-top:40px;border-top:1px solid #ccc;padding-top:20px;font-size:12px;color:#666}
+            </style></head><body>
+            <h1>Ordonnance Médicale — Clinique Nova Médica</h1>
+            <div class="info"><span class="label">Patient :</span> ${patient?.last_name?.toUpperCase()} ${patient?.first_name}</div>
+            <div class="info"><span class="label">Né(e) le :</span> ${patient?.birth_date}</div>
+            <div class="info"><span class="label">N° Sécurité Sociale :</span> ${patient?.social_security_number || '—'}</div>
+            <div class="info"><span class="label">Adresse :</span> ${patient?.address || '—'}</div>
+            <div class="info"><span class="label">Téléphone :</span> ${patient?.phone || '—'}</div>
+            <div class="info"><span class="label">Date de consultation :</span> ${new Date(consultation.consultation_date).toLocaleDateString('fr-FR')}</div>
+            <div class="info"><span class="label">Médecin :</span> ${consultation.doctor}</div>
+            ${consultation.prescription ? `<div class="info"><span class="label">Prescription :</span><div class="content">${consultation.prescription}</div></div>` : '<div class="info"><em>Aucune prescription</em></div>'}
+            <div class="footer">Document généré le ${new Date().toLocaleDateString('fr-FR')} — Clinique Nova Médica</div>
+            </body></html>
+        `);
+        printWindow.document.close();
+        printWindow.print();
+    };
 
     if (loading) return <div className="p-10 text-center font-bold">Chargement du dossier...</div>;
     if (!patient) return <div className="p-10 text-center font-bold text-red-500">Patient introuvable.</div>;
@@ -79,17 +105,8 @@ export default function PatientProfile({ params }) {
                         </Link>
                     )}
 
-                    {/* Print button — praticien only / Bouton impression — praticien uniquement */}
-{user?.role === 'praticien' && (
-    <button
-        onClick={() => window.print()}
-        className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition font-bold shadow-sm"
-    >
-        🖨️ Imprimer / Print
-    </button>
-)}
 
-                    
+
                 </div>
             </div>
 
@@ -110,9 +127,19 @@ export default function PatientProfile({ params }) {
                     <div className="space-y-4">
                         {consultations.map(consult => (
                             <div key={consult.id} className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 border-l-4 border-l-red-500 space-y-3">
-                                <div className="flex justify-between text-sm text-slate-500">
-                                    <span>Date : {new Date(consult.consultation_date).toLocaleDateString('fr-FR')}</span>
-                                    <span>Praticien : {consult.doctor}</span>
+                                <div className="flex justify-between items-start mb-4">
+                                    <div className="text-sm text-slate-500">
+                                        <p className="font-bold text-slate-900">{new Date(consult.consultation_date).toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                                        <p>Praticien : {consult.doctor}</p>
+                                    </div>
+                                    {consult.prescription && (
+                                        <button
+                                            onClick={() => handlePrint(consult)}
+                                            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition-colors"
+                                        >
+                                            <Printer className="w-3.5 h-3.5" /> Ordonnance
+                                        </button>
+                                    )}
                                 </div>
                                 {consult.anamnesis && (
                                     <div>
@@ -126,8 +153,10 @@ export default function PatientProfile({ params }) {
                                 </div>
                                 {consult.prescription && (
                                     <div>
-                                        <p className="font-medium text-slate-800">Ordonnance :</p>
-                                        <p className="text-slate-600 bg-slate-50 p-3 rounded mt-1">{consult.prescription}</p>
+                                        <p className="font-medium text-slate-800 flex items-center gap-1">
+                                            <FileText className="w-3.5 h-3.5 text-slate-400" /> Ordonnance / Prescription :
+                                        </p>
+                                        <p className="text-slate-600 bg-slate-50 p-3 rounded mt-1 whitespace-pre-wrap">{consult.prescription}</p>
                                     </div>
                                 )}
                             </div>

@@ -1,8 +1,9 @@
 'use client';
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { getUsers, createUser, deleteUser, updateUser } from '@/services/api';
-import { User, Heart } from 'lucide-react';
+import { User, Heart, Activity } from 'lucide-react';
 
 export default function AdminPage() {
   const [users, setUsers] = useState([]);
@@ -123,12 +124,21 @@ export default function AdminPage() {
           <h1 className="text-4xl font-black text-gradient tracking-tight">Administration</h1>
           <p className="text-slate-400 mt-1 font-medium">Gestion des comptes utilisateurs et patients.</p>
         </div>
-        <button
-          onClick={() => { setIsAdding(!isAdding); setEditingUser(null); }}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-        >
-          {isAdding ? 'Annuler' : '+ Nouvel Utilisateur'}
-        </button>
+        <div className="flex gap-3">
+          <Link
+            href="/admin/logs"
+            className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors flex items-center gap-2 font-semibold"
+          >
+            <Activity className="w-4 h-4" />
+            Logs
+          </Link>
+          <button
+            onClick={() => { setIsAdding(!isAdding); setEditingUser(null); }}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 font-semibold"
+          >
+            {isAdding ? 'Annuler' : '+ Nouvel Utilisateur'}
+          </button>
+        </div>
       </div>
 
       {/* Barre de recherche*/}
