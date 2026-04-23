@@ -78,6 +78,18 @@ export default function PatientProfile({ params }) {
                             <Stethoscope className="w-4 h-4" /> Nouvelle consultation
                         </Link>
                     )}
+
+                    {/* Print button — praticien only / Bouton impression — praticien uniquement */}
+{user?.role === 'praticien' && (
+    <button
+        onClick={() => window.print()}
+        className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition font-bold shadow-sm"
+    >
+        🖨️ Imprimer / Print
+    </button>
+)}
+
+                    
                 </div>
             </div>
 
