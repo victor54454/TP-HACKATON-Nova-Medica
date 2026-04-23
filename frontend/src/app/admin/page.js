@@ -36,17 +36,27 @@ export default function AdminPage() {
   };
 
   const handleAddUser = async (e) => {
-    e.preventDefault();
-    setAddError(null);
-    try {
-      await createUser({ username: newUsername, password: newPassword, role: newRole });
-      setNewUsername('');
-      setNewPassword('');
-      setIsAdding(false);
-      fetchUsers();
-    } catch (err) {
-      setAddError(err.message);
-    }
+  e.preventDefault();
+  setAddError(null);
+
+  const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{12,}$/;
+
+  if (!passwordRegex.test(newPassword)) {
+    setAddError(
+      "Minimum 12 caractères (0-9, A-Z, @§$!...)"
+    );
+    return;
+  }
+
+  try {
+    await createUser({ username: newUsername, password: newPassword, role: newRole });
+    setNewUsername('');
+    setNewPassword('');
+    setIsAdding(false);
+    fetchUsers();
+  } catch (err) {
+    setAddError(err.message);
+  }
   };
 
   const handleUpdateUser = async (e) => {
